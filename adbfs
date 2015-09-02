@@ -1,0 +1,227 @@
+#! /usr/bin/env python
+"""
+adbfs Virtual filesystem for Midnight Commander
+
+
+* Copyright (c) 2015, Roman Dobosz,
+* Published under 3-clause BSD-style license (see LICENSE file)
+"""
+
+from argparse import ArgumentParser
+from datetime import datetime
+import subprocess
+import os
+import re
+import sys
+
+
+
+class Adb(object):
+    """Class for interact with android rooted device through adb"""
+    adb = "/opt/android-sdk-update-manager/platform-tools/adb"
+    skip_system_dir = os.getenv("ADBFS_SKIP_SYSTEM_DIR", True)
+    dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
+    file_re = re.compile(r'^(?P<perms>[-bcdlps][-rwxsStT]{9})\s+'
+                         r'(?P<links>\d+)\s'
+                         r'(?P<uid>\d+)\s+'
+                         r'(?P<gid>\d+)\s+'
+                         r'(?P<size>\d+)\s[A-Z,a-z]{3}\s'
+                         r'(?P<datetime>[A-Z,a-z]{3}\s+'
+                         r'\d+\s\d{2}:\d{2}:\d{2}\s+\d{4})\s'
+                         r'(?P<name>.*)')
+
+    current_re = re.compile(r"^(\./)?(?P<dir>.+):$")
+    verbose = os.getenv("ADBFS_VERBOSE", False)
+
+    def __init__(self):
+        """Prepare archive content for operations"""
+        super(Adb, self).__init__()
+        self._entries = []
+        self._str_ls = []
+        self._err = None
+
+    def correct_entry(self, entry, current_dir):
+        """parse date string, append current_dir to the entry"""
+        month_num = {"Jan": 1,
+                     "Feb": 2,
+                     "Mar": 3,
+                     "Apr": 4,
+                     "May": 5,
+                     "Jun": 6,
+                     "Jul": 7,
+                     "Aug": 8,
+                     "Sep": 9,
+                     "Oct": 10,
+                     "Nov": 11,
+                     "Dec": 12}
+        entry["dir"] = current_dir
+        date = entry["datetime"].split()
+        date = "%s-%02d-%s %s" % (date[1],
+                                  month_num[date[0]],
+                                  date[3],
+                                  date[2])
+        date = datetime.strptime(date, "%d-%m-%Y %H:%M:%S")
+        entry["datetime"] = date.strftime("%m/%d/%Y %H:%M:01")
+
+    def scan_subdirectory(self, entry):
+        """Recursively scan directory"""
+        lines = subprocess.check_output([Adb.adb, "shell", "su", "-c",
+                                         asdjhsfudh.format(**entry)])
+        current_dir = entry["dir"]
+        for line in lines.split("\n"):
+            line = line.strip()
+            current_dir_re = self.current_re.match(line)
+            if current_dir_re:
+                current_dir = current_dir_re.groupdict()["dir"]
+                continue
+
+            reg_match = self.file_re.match(line)
+            if not reg_match:
+                continue
+
+            entry = reg_match.groupdict()
+            if entry["name"] in (".", ".."):
+                continue
+            self.correct_entry(entry, current_dir)
+
+            if Adb.skip_system_dir and entry['name'] in Adb.dirs_to_skip:
+                continue
+
+            self._entries.append(entry)
+            self._str_ls.append("{perms} {links:>4} {uid:<8} "
+                                "{gid:<8} {size:>8} "
+                                "{datetime} {dir}/{name}\n".format(**entry))
+
+    def retrieve_file_list(self, root=None):
+        """Retrieve file list using adb"""
+
+        command = [Adb.adb, "shell", "su", "-c"]
+        if not root:
+            command.append("'busybox ls -anel'")
+        else:
+            command.append("'busybox ls -Ranel {dir}/{name}'".format(**root))
+
+        lines = subprocess.check_output(command)
+
+        current_dir = root["dir"] if root else ""
+        for line in lines.split("\n"):
+            line = line.strip()
+            current_dir_re = self.current_re.match(line)
+            if current_dir_re:
+                current_dir = current_dir_re.groupdict()["dir"]
+                continue
+
+            reg_match = self.file_re.match(line)
+            if not reg_match:
+                continue
+
+            entry = reg_match.groupdict()
+            if entry["name"] in (".", ".."):
+                continue
+            self.correct_entry(entry, current_dir)
+
+            if Adb.skip_system_dir and entry['name'] in Adb.dirs_to_skip:
+                continue
+
+            self._entries.append(entry)
+            self._str_ls.append("{perms} {links:>4} {uid:<8} "
+                                "{gid:<8} {size:>8} "
+                                "{datetime} {dir}/{name}\n".format(**entry))
+
+            if root is None and entry["perms"].startswith("d"):
+                self.retrieve_file_list(entry)
+
+    def run(self, fname):
+        """Not supported"""
+        self.err = ("Not supported - or maybe you are on compatible "
+                    "architecture?")
+        return self._show_error()
+
+    def list(self):
+        """Output list contents directory"""
+        self.retrieve_file_list()
+        sys.stdout.write("".join(self._str_ls))
+        return 0
+
+    def copyout(self, src, dst):
+        """Copy file form the device using adb."""
+        with open(os.devnull, "w") as fnull:
+            return subprocess.call([Adb.adb, "pull", src, dst],
+                                   stdout=fnull, stderr=fnull)
+
+    def copyin(self, src, dst):
+        """Copy file to the device through adb."""
+        if not dst.startswith("/"):
+            dst = "/" + dst
+
+        with open(os.devnull, "w") as fnull:
+            err = subprocess.call([Adb.adb, "push", src, dst],
+                                  stdout=fnull, stderr=fnull)
+
+        if err != 0:
+            sys.stderr.write("Cannot push the file, "
+                             "%s, error %d" % (dst, err))
+            return 1
+        return 0
+
+    def rm(self, dst):
+        """Remove file from device through adb."""
+        sys.stderr.write("not implemented\n")
+        return 1
+
+    def mkdir(self, dst):
+        """Make directory on the device through adb."""
+        sys.stderr.write("not implemented\n")
+        return 1
+
+    def _show_error(self):
+        """
+        Display an error, if configured, otherwise try to not annoy an user
+        """
+        if Adb.verbose:
+            return self.err
+        else:
+            return 1
+
+
+CALL_MAP = {'list': lambda a: Adb().list(),
+            'copyin': lambda a: Adb().copyin(a.src, a.dst),
+            'copyout': lambda a: Adb().copyout(a.src, a.dst),
+            'mkdir': lambda a: Adb().mkdir(a.dst),
+            'rm': lambda a: Adb().rm(a.dst),
+            'run': lambda a: Adb().run(a.dst)}
+
+def main():
+    """parse commandline"""
+    try:
+        if sys.argv[1] not in ('list', 'copyin', 'copyout', 'rm', 'mkdir',
+                               "run"):
+            sys.exit(2)
+    except IndexError:
+        sys.exit(2)
+
+    class Arg(object):
+        """Mimic argparse/optparse object"""
+        dst = None
+        src = None
+        arch = None
+
+    arg = Arg()
+
+    try:
+        arg.arch = sys.argv[2]
+        if sys.argv[1] == 'copyin':
+            arg.src = sys.argv[4]
+            arg.dst = sys.argv[3]
+        if sys.argv[1] == 'copyout':
+            arg.src = sys.argv[3]
+            arg.dst = sys.argv[4]
+        elif sys.argv[1] in ('rm', 'run', 'mkdir'):
+            arg.dst = sys.argv[3]
+    except IndexError:
+        sys.exit(2)
+
+    return CALL_MAP[sys.argv[1]](arg)
+
+if __name__ == "__main__":
+    sys.exit(main())
