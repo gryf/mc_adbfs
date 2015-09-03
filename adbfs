@@ -2,18 +2,15 @@
 """
 adbfs Virtual filesystem for Midnight Commander
 
-
 * Copyright (c) 2015, Roman Dobosz,
 * Published under 3-clause BSD-style license (see LICENSE file)
 """
 
-from argparse import ArgumentParser
 from datetime import datetime
 import subprocess
 import os
 import re
 import sys
-
 
 
 class Adb(object):
@@ -31,6 +28,7 @@ class Adb(object):
                          r'(?P<name>.*)')
 
     current_re = re.compile(r"^(\./)?(?P<dir>.+):$")
+    as_root = os.getenv("ADBFS_AS_ROOT", False)
     verbose = os.getenv("ADBFS_VERBOSE", False)
 
     def __init__(self):
@@ -62,35 +60,6 @@ class Adb(object):
                                   date[2])
         date = datetime.strptime(date, "%d-%m-%Y %H:%M:%S")
         entry["datetime"] = date.strftime("%m/%d/%Y %H:%M:01")
-
-    def scan_subdirectory(self, entry):
-        """Recursively scan directory"""
-        lines = subprocess.check_output([Adb.adb, "shell", "su", "-c",
-                                         asdjhsfudh.format(**entry)])
-        current_dir = entry["dir"]
-        for line in lines.split("\n"):
-            line = line.strip()
-            current_dir_re = self.current_re.match(line)
-            if current_dir_re:
-                current_dir = current_dir_re.groupdict()["dir"]
-                continue
-
-            reg_match = self.file_re.match(line)
-            if not reg_match:
-                continue
-
-            entry = reg_match.groupdict()
-            if entry["name"] in (".", ".."):
-                continue
-            self.correct_entry(entry, current_dir)
-
-            if Adb.skip_system_dir and entry['name'] in Adb.dirs_to_skip:
-                continue
-
-            self._entries.append(entry)
-            self._str_ls.append("{perms} {links:>4} {uid:<8} "
-                                "{gid:<8} {size:>8} "
-                                "{datetime} {dir}/{name}\n".format(**entry))
 
     def retrieve_file_list(self, root=None):
         """Retrieve file list using adb"""
@@ -165,14 +134,34 @@ class Adb(object):
         return 0
 
     def rm(self, dst):
-        """Remove file from device through adb."""
-        sys.stderr.write("not implemented\n")
-        return 1
+        """Remove file from device."""
+        cmd = [Adb.adb, "shell", "rm", dst]
+        err = subprocess.check_output(cmd)
+
+        if err != "":
+            sys.stderr.write(err)
+            return 1
+        return 0
+
+    def rmdir(self, dst):
+        """Remove directory from device."""
+        cmd = [Adb.adb, "shell", "rm", "-r", dst]
+        err = subprocess.check_output(cmd)
+
+        if err != "":
+            sys.stderr.write(err)
+            return 1
+        return 0
 
     def mkdir(self, dst):
         """Make directory on the device through adb."""
-        sys.stderr.write("not implemented\n")
-        return 1
+        cmd = [Adb.adb, "shell", "mkdir", dst]
+        err = subprocess.check_output(cmd)
+
+        if err != "":
+            sys.stderr.write(err)
+            return 1
+        return 0
 
     def _show_error(self):
         """
@@ -188,14 +177,16 @@ CALL_MAP = {'list': lambda a: Adb().list(),
             'copyin': lambda a: Adb().copyin(a.src, a.dst),
             'copyout': lambda a: Adb().copyout(a.src, a.dst),
             'mkdir': lambda a: Adb().mkdir(a.dst),
+            'rmdir': lambda a: Adb().rmdir(a.dst),
             'rm': lambda a: Adb().rm(a.dst),
             'run': lambda a: Adb().run(a.dst)}
 
 def main():
     """parse commandline"""
     try:
-        if sys.argv[1] not in ('list', 'copyin', 'copyout', 'rm', 'mkdir',
-                               "run"):
+        sys.stderr.write("comnandline: %s\n" % " ".join(sys.argv))
+        if sys.argv[1] not in ('list', 'copyin', 'copyout', 'rm', "rmdir",
+                               'mkdir', "run"):
             sys.exit(2)
     except IndexError:
         sys.exit(2)
@@ -216,7 +207,7 @@ def main():
         if sys.argv[1] == 'copyout':
             arg.src = sys.argv[3]
             arg.dst = sys.argv[4]
-        elif sys.argv[1] in ('rm', 'run', 'mkdir'):
+        elif sys.argv[1] in ('rm', 'rmdir', 'run', 'mkdir'):
             arg.dst = sys.argv[3]
     except IndexError:
         sys.exit(2)
