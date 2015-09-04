@@ -35,10 +35,8 @@ class Adb(object):
         """Prepare archive content for operations"""
         super(Adb, self).__init__()
         self._entries = []
-        self._str_ls = []
-        self._err = None
 
-    def correct_entry(self, entry, current_dir):
+    def _correct_entry(self, entry, current_dir):
         """parse date string, append current_dir to the entry"""
         month_num = {"Jan": 1,
                      "Feb": 2,
@@ -53,6 +51,7 @@ class Adb(object):
                      "Nov": 11,
                      "Dec": 12}
         entry["dir"] = current_dir
+        entry["fullname"] = os.path.join(current_dir, entry['name'])
         date = entry["datetime"].split()
         date = "%s-%02d-%s %s" % (date[1],
                                   month_num[date[0]],
@@ -61,7 +60,64 @@ class Adb(object):
         date = datetime.strptime(date, "%d-%m-%Y %H:%M:%S")
         entry["datetime"] = date.strftime("%m/%d/%Y %H:%M:01")
 
-    def retrieve_file_list(self, root=None):
+    def _mk_rel_links(self, entry):
+        """Convert links to relative, if needed"""
+        fname, target = entry['name'].split(" -> ")
+
+        if not target.startswith("/"):
+            return
+
+        dir_ = entry["dir"] if entry["dir"] else "/"
+        target = os.path.relpath(os.path.join(dir_, target), dir_)
+        entry['name'] = fname + " -> " + target
+
+    def _find_target(self, needle):
+        """Find link target"""
+
+        for entry in self._entries:
+            if ' -> ' in entry["name"] and entry['perms'].startswith("l"):
+                fullname, target = entry["fullname"].split(" -> ")
+                if fullname == needle:
+                    dir_ = entry["dir"] if entry["dir"] else "/"
+                    target = os.path.join(os.path.join(dir_, target), dir_)
+                    target = os.path.abspath(target)
+                    return self._find_target(target)
+            else:
+                if entry['fullname'] == needle:
+                    return entry['fullname']
+        return None
+
+    def _normalize_links(self):
+        """
+        There might be a case of a chain of linked files, like:
+
+            /foo -> /mnt/foo
+            /bar -> /foo
+
+        If one want to follow such 'bar' link - MC in extfs mode will fail to
+        figure out the right target. This helper will correct the thing and
+        remove dead links.
+        """
+
+        elems_to_rm = []
+        for entry in self._entries:
+            if not entry["perms"].startswith("l"):
+                continue
+
+            fname, target = entry['name'].split(" -> ")
+            target = self._find_target(target)
+
+            if not target:
+                elems_to_rm.append(self._entries.index(entry))
+                continue
+
+            entry['name'] = fname + " -> " + target
+            self._mk_rel_links(entry)
+
+        for idx in sorted(elems_to_rm, reverse=True):
+            del self._entries[idx]
+
+    def _retrieve_file_list(self, root=None):
         """Retrieve file list using adb"""
 
         command = [Adb.adb, "shell", "su", "-c"]
@@ -87,29 +143,31 @@ class Adb(object):
             entry = reg_match.groupdict()
             if entry["name"] in (".", ".."):
                 continue
-            self.correct_entry(entry, current_dir)
 
             if Adb.skip_system_dir and entry['name'] in Adb.dirs_to_skip:
                 continue
 
-            self._entries.append(entry)
-            self._str_ls.append("{perms} {links:>4} {uid:<8} "
-                                "{gid:<8} {size:>8} "
-                                "{datetime} {dir}/{name}\n".format(**entry))
+            self._correct_entry(entry, current_dir)
 
+            entry["str"] = ("{perms} {links:>4} {uid:<8} {gid:<8} {size:>8} "
+                            "{datetime} {dir}/{name}\n".format(**entry))
+
+            self._entries.append(entry)
             if root is None and entry["perms"].startswith("d"):
-                self.retrieve_file_list(entry)
+                self._retrieve_file_list(entry)
+
+        self._normalize_links()
 
     def run(self, fname):
         """Not supported"""
-        self.err = ("Not supported - or maybe you are on compatible "
-                    "architecture?")
-        return self._show_error()
+        sys.stderr.write("Not supported - or maybe you are on compatible "
+                         "architecture?\n")
+        return 1
 
     def list(self):
         """Output list contents directory"""
-        self.retrieve_file_list()
-        sys.stdout.write("".join(self._str_ls))
+        self._retrieve_file_list()
+        sys.stdout.write("".join([entry["str"] for entry in self._entries]))
         return 0
 
     def copyout(self, src, dst):
@@ -162,15 +220,6 @@ class Adb(object):
             sys.stderr.write(err)
             return 1
         return 0
-
-    def _show_error(self):
-        """
-        Display an error, if configured, otherwise try to not annoy an user
-        """
-        if Adb.verbose:
-            return self.err
-        else:
-            return 1
 
 
 CALL_MAP = {'list': lambda a: Adb().list(),
