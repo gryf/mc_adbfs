@@ -9,6 +9,7 @@ Rquirements
 ===========
 
 * Python 2.7
+* ``adb`` installed and in ``$PATH``
 * An Android device or emulator preferably rooted
 * Busybox installed and available in the path on the device
 
@@ -17,6 +18,17 @@ Make sure, that issuing from command line::
    $ adb shell busybox ls
 
 should display files from root directory on the device.
+
+Features
+========
+
+* Listing the directory with (default), or without skipping system dirs
+  (``acct``, ``dev``, ``proc``, etc)
+* Copying files from and to the device
+* Creating directories
+* Removing files and directories
+* Symbolic links in lists are corrected to be relative to the file system
+* Symbolic links also point to the right target, skipping intermediate links
 
 Installation
 ============
@@ -35,6 +47,14 @@ under MC - after some time you should see the files and directories on your
 device. For convenience you can add a bookmark (accessible under CTRL+\) for
 fast access. The time is depended on how many files and directories you have on
 your device and how fast it is :)
+
+Limitations
+===========
+
+* Initial listing might be slow. Depending on how fast the device is, how many
+  files are on the device and so on
+* Some filenames might be still inaccessible for operating
+* All files operations which needs root privileges will fail (for now)
 
 License
 =======
