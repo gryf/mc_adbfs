@@ -15,6 +15,10 @@ import re
 import sys
 
 
+DEBUG = os.getenv("ADBFS_DEBUG", False)
+SKIP_SYSTEM_DIR = os.getenv("ADBFS_SKIP_SYSTEM_DIR", True)
+
+
 class File(object):
     """Item in filesystem representation"""
     def __init__(self, perms=None, links=1, uid=0, gid=0, size=0,
@@ -116,8 +120,6 @@ class File(object):
 
 class Adb(object):
     """Class for interact with android rooted device through adb"""
-    adb = "/opt/android-sdk-update-manager/platform-tools/adb"
-    skip_system_dir = os.getenv("ADBFS_SKIP_SYSTEM_DIR", True)
     dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
     file_re = re.compile(r'^(?P<perms>[-bcdlps][-rwxsStT]{9})\s+'
                          r'(?P<links>\d+)\s'
@@ -177,7 +179,9 @@ class Adb(object):
     def _retrieve_file_list(self, root=None):
         """Retrieve file list using adb"""
 
-        command = [Adb.adb, "shell", "su", "-c"]
+        # if root:
+            # print "retrieve for %s" % root.filepath
+        command = ["adb", "shell", "su", "-c"]
         if not root:
             command.append("'busybox ls -anel'")
         else:
@@ -207,7 +211,7 @@ class Adb(object):
             if entry.name in (".", ".."):
                 continue
 
-            if Adb.verbose and entry.name in Adb.dirs_to_skip:
+            if SKIP_SYSTEM_DIR and entry.name in Adb.dirs_to_skip:
                 continue
 
             entry.update(current_dir)
@@ -237,7 +241,7 @@ class Adb(object):
     def copyout(self, src, dst):
         """Copy file form the device using adb."""
         with open(os.devnull, "w") as fnull:
-            return subprocess.call([Adb.adb, "pull", src, dst],
+            return subprocess.call(["adb", "pull", src, dst],
                                    stdout=fnull, stderr=fnull)
 
     def copyin(self, src, dst):
@@ -246,7 +250,7 @@ class Adb(object):
             dst = "/" + dst
 
         with open(os.devnull, "w") as fnull:
-            err = subprocess.call([Adb.adb, "push", src, dst],
+            err = subprocess.call(["adb", "push", src, dst],
                                   stdout=fnull, stderr=fnull)
 
         if err != 0:
@@ -257,7 +261,7 @@ class Adb(object):
 
     def rm(self, dst):
         """Remove file from device."""
-        cmd = [Adb.adb, "shell", "rm", dst]
+        cmd = ["adb", "shell", "rm", dst]
         err = subprocess.check_output(cmd)
 
         if err != "":
@@ -267,7 +271,7 @@ class Adb(object):
 
     def rmdir(self, dst):
         """Remove directory from device."""
-        cmd = [Adb.adb, "shell", "rm", "-r", dst]
+        cmd = ["adb", "shell", "rm", "-r", dst]
         err = subprocess.check_output(cmd)
 
         if err != "":
@@ -277,7 +281,7 @@ class Adb(object):
 
     def mkdir(self, dst):
         """Make directory on the device through adb."""
-        cmd = [Adb.adb, "shell", "mkdir", dst]
+        cmd = ["adb", "shell", "mkdir", dst]
         err = subprocess.check_output(cmd)
 
         if err != "":
@@ -297,7 +301,8 @@ CALL_MAP = {'list': lambda a: Adb().list(),
 def main():
     """parse commandline"""
     try:
-        sys.stderr.write("comnandline: %s\n" % " ".join(sys.argv))
+        if DEBUG:
+            sys.stderr.write("commandline: %s\n" % " ".join(sys.argv))
         if sys.argv[1] not in ('list', 'copyin', 'copyout', 'rm', "rmdir",
                                'mkdir', "run"):
             sys.exit(2)
