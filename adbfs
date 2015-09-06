@@ -9,9 +9,10 @@ Version: 0.7
 """
 
 from datetime import datetime
-import subprocess
 import os
+import pipes
 import re
+import subprocess
 import sys
 
 
@@ -241,7 +242,8 @@ class Adb(object):
     def copyout(self, src, dst):
         """Copy file form the device using adb."""
         with open(os.devnull, "w") as fnull:
-            return subprocess.call(["adb", "pull", src, dst],
+            return subprocess.call(["adb", "pull", pipes.quote(src),
+                                   pipes.quote(dst)],
                                    stdout=fnull, stderr=fnull)
 
     def copyin(self, src, dst):
@@ -250,7 +252,8 @@ class Adb(object):
             dst = "/" + dst
 
         with open(os.devnull, "w") as fnull:
-            err = subprocess.call(["adb", "push", src, dst],
+            err = subprocess.call(["adb", "push", pipes.quote(src),
+                                   pipes.quote(dst)],
                                   stdout=fnull, stderr=fnull)
 
         if err != 0:
@@ -261,7 +264,7 @@ class Adb(object):
 
     def rm(self, dst):
         """Remove file from device."""
-        cmd = ["adb", "shell", "rm", dst]
+        cmd = ["adb", "shell", "rm", pipes.quote(dst)]
         err = subprocess.check_output(cmd)
 
         if err != "":
@@ -271,7 +274,7 @@ class Adb(object):
 
     def rmdir(self, dst):
         """Remove directory from device."""
-        cmd = ["adb", "shell", "rm", "-r", dst]
+        cmd = ["adb", "shell", "rm", "-r", pipes.quote(dst)]
         err = subprocess.check_output(cmd)
 
         if err != "":
@@ -281,7 +284,7 @@ class Adb(object):
 
     def mkdir(self, dst):
         """Make directory on the device through adb."""
-        cmd = ["adb", "shell", "mkdir", dst]
+        cmd = ["adb", "shell", "mkdir", pipes.quote(dst)]
         err = subprocess.check_output(cmd)
 
         if err != "":
