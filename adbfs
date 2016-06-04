@@ -331,7 +331,7 @@ class Adb(object):
 
     def rm(self, dst):
         """Remove file from device."""
-        cmd = ["adb", "shell", "rm", pipes.quote(dst)]
+        cmd = ["adb", "shell", "rm", dst]
         err = subprocess.check_output(cmd)
 
         if err != "":
@@ -341,7 +341,7 @@ class Adb(object):
 
     def rmdir(self, dst):
         """Remove directory from device."""
-        cmd = ["adb", "shell", "rm", "-r", pipes.quote(dst)]
+        cmd = ["adb", "shell", "rm", "-r", dst]
         err = subprocess.check_output(cmd)
 
         if err != "":
@@ -351,7 +351,8 @@ class Adb(object):
 
     def mkdir(self, dst):
         """Make directory on the device through adb."""
-        cmd = ["adb", "shell", "mkdir", pipes.quote(dst)]
+
+        cmd = ["adb", "shell", "mkdir", dst]
         err = subprocess.check_output(cmd)
 
         if err != "":
