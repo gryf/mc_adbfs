@@ -23,16 +23,17 @@ BOX = os.getenv("ADBFS_BOX", "busybox")
 
 class File(object):
     """Item in filesystem representation"""
-    def __init__(self, perms=None, links=1, uid=0, gid=0, size=0,
-                 date_time=None, name=None):
+    def __init__(self, perms=None, links=1, uid=0, gid=0, size=None,
+                 date_time=None, date=None, name=None):
         """initialize file"""
         self.perms = perms
         self.links = links
         self.uid = uid
         self.gid = gid
-        self.size = size
+        self.size = size if size else 0
         self.date_time = date_time  # as string
         self.name = name
+        self.date = date  # as string
 
         self.dirname = ""
         self.type = None
@@ -48,6 +49,10 @@ class File(object):
             return
 
         self.name = name
+
+        if not self.size:
+            self.size = 0
+
         if target.startswith("/"):
             self.link_target = target
         else:
@@ -69,13 +74,18 @@ class File(object):
                      "Nov": 11,
                      "Dec": 12}
         self.dirname = dirname
-        date = self.date_time.split()
-        date = "%s-%02d-%s %s" % (date[1],
-                                  month_num[date[0]],
-                                  date[3],
-                                  date[2])
-        date = datetime.strptime(date, "%d-%m-%Y %H:%M:%S")
+        if self.date_time:
+            date = self.date_time.split()
+            date = "%s-%02d-%s %s" % (date[1],
+                                      month_num[date[0]],
+                                      date[3],
+                                      date[2])
+            date = datetime.strptime(date, "%d-%m-%Y %H:%M:%S")
+        elif self.date:
+            date = datetime.strptime(self.date, "%Y-%m-%d %H:%M")
+
         self.date_time = date.strftime("%m/%d/%Y %H:%M:01")
+
         self.type = self.perms[0] if self.perms else None
 
         if self.type == "l" and " -> " in self.name:
@@ -120,24 +130,70 @@ class File(object):
 class Adb(object):
     """Class for interact with android rooted device through adb"""
     dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
-    file_re = re.compile(r'^(?P<perms>[-bcdlps][-rwxsStT]{9})\s+'
-                         r'(?P<links>\d+)\s'
-                         r'(?P<uid>\d+)\s+'
-                         r'(?P<gid>\d+)\s+'
-                         r'(?P<size>\d+)\s[A-Z,a-z]{3}\s'
-                         r'(?P<date_time>[A-Z,a-z]{3}\s+'
-                         r'\d+\s\d{2}:\d{2}:\d{2}\s+\d{4})\s'
-                         r'(?P<name>.*)')
-
+    file_re = None
     current_re = re.compile(r"^(\./)?(?P<dir>.+):$")
     as_root = os.getenv("ADBFS_AS_ROOT", False)
     verbose = os.getenv("ADBFS_VERBOSE", False)
+    boxes = {'busybox': {'ls': 'busybox ls -anel',
+                         'rls':  'busybox ls -Ranel {}',
+                         'file_re': r'^(?P<perms>[-bcdlps][-rwxsStT]{9})\s+'
+                                    r'(?P<links>\d+)\s'
+                                    r'(?P<uid>\d+)\s+'
+                                    r'(?P<gid>\d+)\s+'
+                                    r'(?P<size>\d+)\s[A-Z,a-z]{3}\s'
+                                    r'(?P<date_time>[A-Z,a-z]{3}\s+'
+                                    r'\d+\s\d{2}:\d{2}:\d{2}\s+\d{4})\s'
+                                    r'(?P<name>.*)'},
+             'toolbox': {'ls': 'toolbox ls -anl',
+                         'rls':  'toolbox ls -Ranl {}',
+                         'file_re': r'^(?P<perms>[-bcdlps][-rwxsStT]{9})\s+'
+                                    r'(?P<uid>\d+)\s+'
+                                    r'(?P<gid>\d+)\s+'
+                                    r'(?P<size>\d+)?\s'
+                                    r'(?P<date>\d{4}-\d{2}-\d{2}\s'
+                                    r'\d{2}:\d{2})\s'
+                                    r'(?P<name>.*)'}
+            }
+
 
     def __init__(self):
         """Prepare archive content for operations"""
         super(Adb, self).__init__()
         self._entries = []
         self._links = {}
+
+        self.__su_check()
+        self.__get_the_box()
+        self.file_re = re.compile(self.box['file_re'])
+
+    def __get_the_box(self):
+        """Detect if we dealing with busybox or toolbox"""
+        result = subprocess.check_output('adb shell which busybox'.split())
+        if 'busybox' in result:
+            self.box = Adb.boxes['busybox']
+            return
+
+        result = subprocess.check_output('adb shell which toolbox'.split())
+        if 'toolbox' in result:
+            self.box = Adb.boxes['toolbox']
+            return
+
+        print "There is no toolbox or busybox available" if DEBUG else None
+        sys.exit(100)
+
+    def __su_check(self):
+        """Check if we are able to get elevated privileges"""
+        try:
+            result = subprocess.check_output('adb shell su -c whoami'.split())
+        except:
+            sys.stderr.write("Unable to get to the device")
+            sys.exit(102)
+
+        if 'root' in result:
+            return
+
+        print "Unable to get root privileges on device" if DEBUG else None
+        sys.exit(101)
 
     def _find_target(self, needle):
         """Find link target"""
@@ -180,9 +236,9 @@ class Adb(object):
         command = ["adb", "shell", "su", "-c"]
 
         if not root:
-            command.append("busybox ls -anel")
+            command.append(self.box['ls'])
         else:
-            command.append("busybox ls -Ranel {}".format(root.filepath))
+            command.append(self.box['rls'].format(root.filepath))
 
         try:
             if DEBUG:
@@ -352,3 +408,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
