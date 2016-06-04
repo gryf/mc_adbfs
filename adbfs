@@ -14,6 +14,7 @@ import pipes
 import re
 import subprocess
 import sys
+import argparse
 
 
 DEBUG = os.getenv("ADBFS_DEBUG", False)
@@ -159,41 +160,60 @@ class Adb(object):
     def __init__(self):
         """Prepare archive content for operations"""
         super(Adb, self).__init__()
+        self.error = ''
+        self.box = None
         self._entries = []
         self._links = {}
+        self._got_root = False
 
         self.__su_check()
         self.__get_the_box()
-        self.file_re = re.compile(self.box['file_re'])
 
     def __get_the_box(self):
         """Detect if we dealing with busybox or toolbox"""
-        result = subprocess.check_output('adb shell which busybox'.split())
-        if 'busybox' in result:
-            self.box = Adb.boxes['busybox']
-            return
 
-        result = subprocess.check_output('adb shell which toolbox'.split())
-        if 'toolbox' in result:
-            self.box = Adb.boxes['toolbox']
-            return
+        try:
+            with open(os.devnull, "w") as fnull:
+                result = subprocess.check_output('adb shell which '
+                                                 'busybox'.split(),
+                                                 stderr=fnull)
 
-        print "There is no toolbox or busybox available" if DEBUG else None
-        sys.exit(100)
+            if 'busybox' in result:
+                self.box = Adb.boxes['busybox']
+                self.file_re = re.compile(self.box['file_re'])
+                return
+        except subprocess.CalledProcessError:
+            pass
+
+        try:
+            with open(os.devnull, "w") as fnull:
+                result = subprocess.check_output('adb shell which '
+                                                 'toolbox'.split(),
+                                                 stderr=fnull)
+
+            if 'toolbox' in result:
+                self.box = Adb.boxes['toolbox']
+                self.file_re = re.compile(self.box['file_re'])
+                return
+        except subprocess.CalledProcessError:
+            pass
+
+        self.error = "There is no toolbox or busybox available"
 
     def __su_check(self):
         """Check if we are able to get elevated privileges"""
         try:
-            result = subprocess.check_output('adb shell su -c whoami'.split())
-        except:
-            sys.stderr.write("Unable to get to the device")
-            sys.exit(102)
+            with open(os.devnull, "w") as fnull:
+                result = subprocess.check_output('adb shell su -c '
+                                                 'whoami'.split(),
+                                                 stderr=fnull)
 
-        if 'root' in result:
+        except subprocess.CalledProcessError:
             return
 
-        print "Unable to get root privileges on device" if DEBUG else None
-        sys.exit(101)
+        if 'root' in result:
+            self._got_root = True
+            return
 
     def _find_target(self, needle):
         """Find link target"""
@@ -287,6 +307,10 @@ class Adb(object):
 
     def list(self):
         """Output list contents directory"""
+        if self.error:
+            sys.stderr.write(self.error)
+            return 1
+
         self._retrieve_file_list()
         self._normalize_links()
         # with open(os.path.join(os.path.dirname(os.path.realpath(__file__)),
@@ -300,18 +324,28 @@ class Adb(object):
 
     def copyout(self, src, dst):
         """Copy file form the device using adb."""
-        # cmd = ["adb", "pull", pipes.quote(src), pipes.quote(dst)]
+        if self.error:
+            sys.stderr.write(self.error)
+            return 1
+
         cmd = ["adb", "pull", src, dst]
         if DEBUG:
             sys.stderr.write(" ".join(cmd) + "\n")
 
         with open(os.devnull, "w") as fnull:
-            err = subprocess.call(cmd, stdout=fnull, stderr=fnull)
+            try:
+                err = subprocess.call(cmd, stdout=fnull, stderr=fnull)
+            except subprocess.CalledProcessError:
+                sys.stderr.write('Error executing adb shell')
+                return 1
 
         return err
 
     def copyin(self, src, dst):
         """Copy file to the device through adb."""
+        if self.error:
+            sys.stderr.write(self.error)
+            return 1
         if not dst.startswith("/"):
             dst = "/" + dst
 
@@ -321,7 +355,11 @@ class Adb(object):
             sys.stderr.write(" ".join(cmd) + "\n")
 
         with open(os.devnull, "w") as fnull:
-            err = subprocess.call(cmd, stdout=fnull, stderr=fnull)
+            try:
+                err = subprocess.call(cmd, stdout=fnull, stderr=fnull)
+            except subprocess.CalledProcessError:
+                sys.stderr.write('Error executing adb shell')
+                return 1
 
         if err != 0:
             sys.stderr.write("Cannot push the file, "
@@ -331,8 +369,16 @@ class Adb(object):
 
     def rm(self, dst):
         """Remove file from device."""
+        if self.error:
+            sys.stderr.write(self.error)
+            return 1
+
         cmd = ["adb", "shell", "rm", dst]
-        err = subprocess.check_output(cmd)
+        try:
+            err = subprocess.check_output(cmd)
+        except subprocess.CalledProcessError:
+            sys.stderr.write('Error executing adb shell')
+            return 1
 
         if err != "":
             sys.stderr.write(err)
@@ -341,8 +387,16 @@ class Adb(object):
 
     def rmdir(self, dst):
         """Remove directory from device."""
+        if self.error:
+            sys.stderr.write(self.error)
+            return 1
+
         cmd = ["adb", "shell", "rm", "-r", dst]
-        err = subprocess.check_output(cmd)
+        try:
+            err = subprocess.check_output(cmd)
+        except subprocess.CalledProcessError:
+            sys.stderr.write('Error executing adb shell')
+            return 1
 
         if err != "":
             sys.stderr.write(err)
@@ -351,9 +405,16 @@ class Adb(object):
 
     def mkdir(self, dst):
         """Make directory on the device through adb."""
+        if self.error:
+            sys.stderr.write(self.error)
+            return 1
 
         cmd = ["adb", "shell", "mkdir", dst]
-        err = subprocess.check_output(cmd)
+        try:
+            err = subprocess.check_output(cmd)
+        except subprocess.CalledProcessError:
+            sys.stderr.write('Error executing adb shell')
+            return 1
 
         if err != "":
             sys.stderr.write(err)
@@ -369,44 +430,46 @@ CALL_MAP = {'list': lambda a: Adb().list(),
             'rm': lambda a: Adb().rm(a.dst),
             'run': lambda a: Adb().run(a.dst)}
 
+
 def main():
     """parse commandline"""
-    try:
-        if DEBUG:
-            sys.stderr.write("commandline: %s\n" % " ".join(sys.argv))
-        if sys.argv[1] not in ('list', 'copyin', 'copyout', 'rm', "rmdir",
-                               'mkdir', "run"):
-            print "missing argument" if DEBUG else None
-            sys.exit(2)
-    except IndexError:
-        sys.exit(2)
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(help='supported commands')
+    parser_list = subparsers.add_parser('list')
+    parser_copyin = subparsers.add_parser('copyin')
+    parser_copyout = subparsers.add_parser('copyout')
+    parser_rm = subparsers.add_parser('rm')
+    parser_mkdir = subparsers.add_parser('mkdir')
+    parser_run = subparsers.add_parser('run')
 
-    class Arg(object):
-        """Mimic argparse/optparse object"""
-        dst = None
-        src = None
-        arch = None
+    parser_list.add_argument('arch')
+    parser_list.set_defaults(func=CALL_MAP['list'])
 
-    arg = Arg()
+    parser_copyin.add_argument('arch')
+    parser_copyin.add_argument('src')
+    parser_copyin.add_argument('dst')
+    parser_copyin.set_defaults(func=CALL_MAP['copyin'])
 
-    try:
-        arg.arch = sys.argv[2]
-        if sys.argv[1] == 'copyin':
-            arg.src = sys.argv[4]
-            arg.dst = sys.argv[3]
-        if sys.argv[1] == 'copyout':
-            arg.src = sys.argv[3]
-            arg.dst = sys.argv[4]
-        elif sys.argv[1] in ('rm', 'rmdir', 'run', 'mkdir'):
-            arg.dst = sys.argv[3]
-    except IndexError:
-        if DEBUG:
-            print "there is a problem with identifying command and its args"
-            print "current args:", sys.argv
-        sys.exit(2)
+    parser_copyout.add_argument('arch')
+    parser_copyout.add_argument('src')
+    parser_copyout.add_argument('dst')
+    parser_copyout.set_defaults(func=CALL_MAP['copyout'])
 
-    return CALL_MAP[sys.argv[1]](arg)
+    parser_rm.add_argument('arch')
+    parser_rm.add_argument('dst')
+    parser_rm.set_defaults(func=CALL_MAP['rm'])
+
+    parser_mkdir.add_argument('arch')
+    parser_mkdir.add_argument('dst')
+    parser_mkdir.set_defaults(func=CALL_MAP['mkdir'])
+
+    parser_run.add_argument('arch')
+    parser_run.add_argument('dst')
+    parser_run.set_defaults(func=CALL_MAP['run'])
+
+    args = parser.parse_args()
+    return args.func(args)
+
 
 if __name__ == "__main__":
     sys.exit(main())
-
