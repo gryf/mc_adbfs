@@ -17,7 +17,7 @@ Make sure, that issuing from command line::
 
    $ adb shell busybox ls
 
-should display files from root directory on the device.
+it should display files from root directory on the device.
 
 Features
 ========
@@ -55,6 +55,8 @@ Limitations
   files are on the device and so on
 * Some filenames might be still inaccessible for operating
 * All files operations which needs root privileges will fail (for now)
+* The implementation is experimental and it's by now working with mine device;
+  while it might not work with yours
 
 License
 =======

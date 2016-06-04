@@ -18,6 +18,7 @@ import sys
 
 DEBUG = os.getenv("ADBFS_DEBUG", False)
 SKIP_SYSTEM_DIR = os.getenv("ADBFS_SKIP_SYSTEM_DIR", True)
+BOX = os.getenv("ADBFS_BOX", "busybox")
 
 
 class File(object):
@@ -84,10 +85,7 @@ class File(object):
 
     def mk_link_relative(self, target_type):
         """Convert links to relative"""
-        rel_path = self.dirname
-        # if target_type == "d":
-            # rel_path = self.filepath
-        self.link_target = os.path.relpath(self.link_target, rel_path)
+        self.link_target = os.path.relpath(self.link_target, self.dirname)
 
     def __repr__(self):
         """represent the file/entire node"""
@@ -179,16 +177,17 @@ class Adb(object):
 
     def _retrieve_file_list(self, root=None):
         """Retrieve file list using adb"""
-
-        # if root:
-            # print "retrieve for %s" % root.filepath
         command = ["adb", "shell", "su", "-c"]
+
         if not root:
-            command.append("'busybox ls -anel'")
+            command.append("busybox ls -anel")
         else:
-            command.append("'busybox ls -Ranel {}'".format(root.filepath))
+            command.append("busybox ls -Ranel {}".format(root.filepath))
 
         try:
+            if DEBUG:
+                print "executing", " ".join(command)
+
             lines = subprocess.check_output(command)
         except subprocess.CalledProcessError:
             sys.stderr.write("Cannot read directory. Is device connected?\n")
@@ -233,28 +232,40 @@ class Adb(object):
     def list(self):
         """Output list contents directory"""
         self._retrieve_file_list()
-        # self._retrieve_file_list_from_pickle()
-        # self._save_file_list_to_pickle()
         self._normalize_links()
+        # with open(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                               # # "list.pcl"), "w") as fob:
+                               # "list.pcl")) as fob:
+            # import cPickle
+            # # cPickle.dump(self._entries, fob)
+            # self._entries = cPickle.load(fob)
         sys.stdout.write("".join([str(entry) for entry in self._entries]))
         return 0
 
     def copyout(self, src, dst):
         """Copy file form the device using adb."""
+        # cmd = ["adb", "pull", pipes.quote(src), pipes.quote(dst)]
+        cmd = ["adb", "pull", src, dst]
+        if DEBUG:
+            sys.stderr.write(" ".join(cmd) + "\n")
+
         with open(os.devnull, "w") as fnull:
-            return subprocess.call(["adb", "pull", pipes.quote(src),
-                                   pipes.quote(dst)],
-                                   stdout=fnull, stderr=fnull)
+            err = subprocess.call(cmd, stdout=fnull, stderr=fnull)
+
+        return err
 
     def copyin(self, src, dst):
         """Copy file to the device through adb."""
         if not dst.startswith("/"):
             dst = "/" + dst
 
+        # cmd = ["adb", "push", pipes.quote(src), pipes.quote(dst)]
+        cmd = ["adb", "push", src, dst]
+        if DEBUG:
+            sys.stderr.write(" ".join(cmd) + "\n")
+
         with open(os.devnull, "w") as fnull:
-            err = subprocess.call(["adb", "push", pipes.quote(src),
-                                   pipes.quote(dst)],
-                                  stdout=fnull, stderr=fnull)
+            err = subprocess.call(cmd, stdout=fnull, stderr=fnull)
 
         if err != 0:
             sys.stderr.write("Cannot push the file, "
@@ -308,6 +319,7 @@ def main():
             sys.stderr.write("commandline: %s\n" % " ".join(sys.argv))
         if sys.argv[1] not in ('list', 'copyin', 'copyout', 'rm', "rmdir",
                                'mkdir', "run"):
+            print "missing argument" if DEBUG else None
             sys.exit(2)
     except IndexError:
         sys.exit(2)
@@ -331,6 +343,9 @@ def main():
         elif sys.argv[1] in ('rm', 'rmdir', 'run', 'mkdir'):
             arg.dst = sys.argv[3]
     except IndexError:
+        if DEBUG:
+            print "there is a problem with identifying command and its args"
+            print "current args:", sys.argv
         sys.exit(2)
 
     return CALL_MAP[sys.argv[1]](arg)
