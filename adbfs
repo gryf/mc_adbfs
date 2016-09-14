@@ -409,6 +409,9 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 1
 
+        if not dst.startswith("/"):
+            dst = "/" + dst
+
         cmd = ["adb", "shell", "mkdir", dst]
         try:
             err = subprocess.check_output(cmd)
@@ -440,14 +443,15 @@ def main():
     parser_copyout = subparsers.add_parser('copyout')
     parser_rm = subparsers.add_parser('rm')
     parser_mkdir = subparsers.add_parser('mkdir')
+    parser_rmdir = subparsers.add_parser('rmdir')
     parser_run = subparsers.add_parser('run')
 
     parser_list.add_argument('arch')
     parser_list.set_defaults(func=CALL_MAP['list'])
 
     parser_copyin.add_argument('arch')
-    parser_copyin.add_argument('src')
     parser_copyin.add_argument('dst')
+    parser_copyin.add_argument('src')
     parser_copyin.set_defaults(func=CALL_MAP['copyin'])
 
     parser_copyout.add_argument('arch')
@@ -462,6 +466,10 @@ def main():
     parser_mkdir.add_argument('arch')
     parser_mkdir.add_argument('dst')
     parser_mkdir.set_defaults(func=CALL_MAP['mkdir'])
+
+    parser_rmdir.add_argument('arch')
+    parser_rmdir.add_argument('dst')
+    parser_rmdir.set_defaults(func=CALL_MAP['rmdir'])
 
     parser_run.add_argument('arch')
     parser_run.add_argument('dst')
