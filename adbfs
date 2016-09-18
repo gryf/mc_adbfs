@@ -2,24 +2,121 @@
 """
 adbfs Virtual filesystem for Midnight Commander
 
-* Copyright (c) 2015, Roman Dobosz,
+* Copyright (c) 2016, Roman Dobosz,
 * Published under 3-clause BSD-style license (see LICENSE file)
-
-Version: 0.7
 """
 
+import ConfigParser
+import argparse
 from datetime import datetime
+import errno
+import json
 import os
-import pipes
 import re
 import subprocess
 import sys
-import argparse
+
+__version__ = 0.8
+
+XDG_CONFIG_HOME = os.getenv("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
 
 
-DEBUG = os.getenv("ADBFS_DEBUG", False)
-SKIP_SYSTEM_DIR = os.getenv("ADBFS_SKIP_SYSTEM_DIR", True)
-BOX = os.getenv("ADBFS_BOX", "busybox")
+class NoBoxFoundException(OSError):
+    """
+    Exception raised in case of not found either toolbox or busybox on remote
+    filesystem accessed via adb
+    """
+    pass
+
+class Conf(object):
+    """Simple config parser"""
+    boxes = {'busybox': {'ls': 'busybox ls -anel',
+                         'rls':  'busybox ls -Ranel {}',
+                         'file_re': r'^(?P<perms>[-bcdlps][-rwxsStT]{9})\s+'
+                                    r'(?P<links>\d+)\s'
+                                    r'(?P<uid>\d+)\s+'
+                                    r'(?P<gid>\d+)\s+'
+                                    r'(?P<size>\d+)\s[A-Z,a-z]{3}\s'
+                                    r'(?P<date_time>[A-Z,a-z]{3}\s+'
+                                    r'\d+\s\d{2}:\d{2}:\d{2}\s+\d{4})\s'
+                                    r'(?P<name>.*)'},
+             'toolbox': {'ls': 'toolbox ls -anl',
+                         'rls':  'toolbox ls -Ranl {}',
+                         'file_re': r'^(?P<perms>[-bcdlps][-rwxsStT]{9})\s+'
+                                    r'(?P<uid>\d+)\s+'
+                                    r'(?P<gid>\d+)\s+'
+                                    r'(?P<size>\d+)?\s'
+                                    r'(?P<date>\d{4}-\d{2}-\d{2}\s'
+                                    r'\d{2}:\d{2})\s'
+                                    r'(?P<name>.*)'}
+            }
+
+    def __init__(self):
+        self.box = None
+        self.debug = False
+        self.skip_dirs = True
+        self.dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
+
+        self.get_the_box()
+        self.read()
+
+    def get_the_box(self):
+        """Detect if we dealing with busybox or toolbox"""
+        try:
+            with open(os.devnull, "w") as fnull:
+                result = subprocess.check_output('adb shell which '
+                                                 'busybox'.split(),
+                                                 stderr=fnull)
+
+            if 'busybox' in result:
+                self.box = Conf.boxes['busybox']
+                Adb.file_re = re.compile(self.box['file_re'])
+                return
+        except subprocess.CalledProcessError:
+            pass
+
+        try:
+            with open(os.devnull, "w") as fnull:
+                result = subprocess.check_output('adb shell which '
+                                                 'toolbox'.split(),
+                                                 stderr=fnull)
+
+            if 'toolbox' in result:
+                self.box = Conf.boxes['toolbox']
+                Adb.file_re = re.compile(self.box['file_re'])
+                return
+        except subprocess.CalledProcessError:
+            pass
+
+        raise NoBoxFoundException(errno.ENOENT,
+                                  "There is no toolbox or busybox available")
+
+    def read(self):
+        """
+        Read config file and change the options according to values from that
+        file.
+        """
+        if not os.path.exists(XDG_CONFIG_HOME):
+            return
+
+        conf_fname = os.path.join(XDG_CONFIG_HOME, 'mc', 'adbfs.ini')
+        if not os.path.exists(conf_fname):
+            return
+
+        cfg = ConfigParser.SafeConfigParser()
+        cfg_map = {'debug': (cfg.getboolean, 'debug'),
+                   'skip_dirs': (cfg.getboolean, 'skip_dirs'),
+                   'dirs_to_skip': (cfg.get, 'dirs_to_skip')}
+        cfg.read(conf_fname)
+
+        for key, (function, attr) in cfg_map.items():
+            try:
+                setattr(self, attr, function('adbfs', key))
+            except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
+                pass
+
+        if isinstance(self.dirs_to_skip, str):
+            self.dirs_to_skip = json.loads(self.dirs_to_skip, encoding="ascii")
 
 
 class File(object):
@@ -94,7 +191,7 @@ class File(object):
 
         self.filepath = os.path.join(self.dirname, self.name)
 
-    def mk_link_relative(self, target_type):
+    def mk_link_relative(self):
         """Convert links to relative"""
         self.link_target = os.path.relpath(self.link_target, self.dirname)
 
@@ -133,72 +230,17 @@ class Adb(object):
     dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
     file_re = None
     current_re = re.compile(r"^(\./)?(?P<dir>.+):$")
-    as_root = os.getenv("ADBFS_AS_ROOT", False)
-    verbose = os.getenv("ADBFS_VERBOSE", False)
-    boxes = {'busybox': {'ls': 'busybox ls -anel',
-                         'rls':  'busybox ls -Ranel {}',
-                         'file_re': r'^(?P<perms>[-bcdlps][-rwxsStT]{9})\s+'
-                                    r'(?P<links>\d+)\s'
-                                    r'(?P<uid>\d+)\s+'
-                                    r'(?P<gid>\d+)\s+'
-                                    r'(?P<size>\d+)\s[A-Z,a-z]{3}\s'
-                                    r'(?P<date_time>[A-Z,a-z]{3}\s+'
-                                    r'\d+\s\d{2}:\d{2}:\d{2}\s+\d{4})\s'
-                                    r'(?P<name>.*)'},
-             'toolbox': {'ls': 'toolbox ls -anl',
-                         'rls':  'toolbox ls -Ranl {}',
-                         'file_re': r'^(?P<perms>[-bcdlps][-rwxsStT]{9})\s+'
-                                    r'(?P<uid>\d+)\s+'
-                                    r'(?P<gid>\d+)\s+'
-                                    r'(?P<size>\d+)?\s'
-                                    r'(?P<date>\d{4}-\d{2}-\d{2}\s'
-                                    r'\d{2}:\d{2})\s'
-                                    r'(?P<name>.*)'}
-            }
-
 
     def __init__(self):
         """Prepare archive content for operations"""
         super(Adb, self).__init__()
+        self.conf = Conf()
         self.error = ''
-        self.box = None
         self._entries = []
         self._links = {}
         self._got_root = False
 
         self.__su_check()
-        self.__get_the_box()
-
-    def __get_the_box(self):
-        """Detect if we dealing with busybox or toolbox"""
-
-        try:
-            with open(os.devnull, "w") as fnull:
-                result = subprocess.check_output('adb shell which '
-                                                 'busybox'.split(),
-                                                 stderr=fnull)
-
-            if 'busybox' in result:
-                self.box = Adb.boxes['busybox']
-                self.file_re = re.compile(self.box['file_re'])
-                return
-        except subprocess.CalledProcessError:
-            pass
-
-        try:
-            with open(os.devnull, "w") as fnull:
-                result = subprocess.check_output('adb shell which '
-                                                 'toolbox'.split(),
-                                                 stderr=fnull)
-
-            if 'toolbox' in result:
-                self.box = Adb.boxes['toolbox']
-                self.file_re = re.compile(self.box['file_re'])
-                return
-        except subprocess.CalledProcessError:
-            pass
-
-        self.error = "There is no toolbox or busybox available"
 
     def __su_check(self):
         """Check if we are able to get elevated privileges"""
@@ -227,6 +269,7 @@ class Adb(object):
         for entry in self._entries:
             if entry.filepath == needle:
                 return entry
+
         return None
 
     def _normalize_links(self):
@@ -244,7 +287,7 @@ class Adb(object):
             target_entry = self._find_target(entry.link_target)
             if target_entry:
                 entry.link_target = target_entry.filepath
-                entry.mk_link_relative(target_entry.type)
+                entry.mk_link_relative()
             else:
                 elems_to_remove.append(self._entries.index(entry))
 
@@ -254,14 +297,15 @@ class Adb(object):
     def _retrieve_file_list(self, root=None):
         """Retrieve file list using adb"""
         command = ["adb", "shell", "su", "-c"]
+        skip_dirs = self.conf.skip_dirs
 
         if not root:
-            command.append(self.box['ls'])
+            command.append(self.conf.box['ls'])
         else:
-            command.append(self.box['rls'].format(root.filepath))
+            command.append(self.conf.box['rls'].format(root.filepath))
 
         try:
-            if DEBUG:
+            if self.conf.debug:
                 print "executing", " ".join(command)
 
             lines = subprocess.check_output(command)
@@ -287,10 +331,10 @@ class Adb(object):
             if entry.name in (".", ".."):
                 continue
 
-            if SKIP_SYSTEM_DIR and entry.name in Adb.dirs_to_skip:
-                continue
-
             entry.update(current_dir)
+
+            if skip_dirs and entry.filepath in self.conf.dirs_to_skip:
+                continue
 
             self._entries.append(entry)
             if root is None and entry.type == "d":
@@ -329,7 +373,7 @@ class Adb(object):
             return 1
 
         cmd = ["adb", "pull", src, dst]
-        if DEBUG:
+        if self.conf.debug:
             sys.stderr.write(" ".join(cmd) + "\n")
 
         with open(os.devnull, "w") as fnull:
@@ -351,7 +395,7 @@ class Adb(object):
 
         # cmd = ["adb", "push", pipes.quote(src), pipes.quote(dst)]
         cmd = ["adb", "push", src, dst]
-        if DEBUG:
+        if self.conf.debug:
             sys.stderr.write(" ".join(cmd) + "\n")
 
         with open(os.devnull, "w") as fnull:
@@ -475,7 +519,11 @@ def main():
     parser_run.add_argument('dst')
     parser_run.set_defaults(func=CALL_MAP['run'])
 
+    parser.add_argument('--version', action='version',
+                        version='%(prog)s ' + str(__version__))
+
     args = parser.parse_args()
+
     return args.func(args)
 
 
