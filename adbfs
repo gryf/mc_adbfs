@@ -54,8 +54,8 @@ class Conf(object):
     def __init__(self):
         self.box = None
         self.debug = False
-        self.skip_dirs = True
         self.dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
+        self.root = None
 
         self.get_the_box()
         self.read()
@@ -105,8 +105,8 @@ class Conf(object):
 
         cfg = ConfigParser.SafeConfigParser()
         cfg_map = {'debug': (cfg.getboolean, 'debug'),
-                   'skip_dirs': (cfg.getboolean, 'skip_dirs'),
-                   'dirs_to_skip': (cfg.get, 'dirs_to_skip')}
+                   'dirs_to_skip': (cfg.get, 'dirs_to_skip'),
+                   'root': (cfg.get, 'root')}
         cfg.read(conf_fname)
 
         for key, (function, attr) in cfg_map.items():
@@ -115,8 +115,11 @@ class Conf(object):
             except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
                 pass
 
-        if isinstance(self.dirs_to_skip, str):
+        if self.dirs_to_skip and isinstance(self.dirs_to_skip, str):
             self.dirs_to_skip = json.loads(self.dirs_to_skip, encoding="ascii")
+            self.dirs_to_skip = [x.encode('utf-8') for x in self.dirs_to_skip]
+        else:
+            self.dirs_to_skip = []
 
 
 class File(object):
@@ -227,7 +230,6 @@ class File(object):
 
 class Adb(object):
     """Class for interact with android rooted device through adb"""
-    dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
     file_re = None
     current_re = re.compile(r"^(\./)?(?P<dir>.+):$")
 
@@ -294,10 +296,63 @@ class Adb(object):
         for idx in sorted(elems_to_remove, reverse=True):
             del self._entries[idx]
 
+    def _retrieve_single_dir_list(self, dir_):
+        """Retrieve file list using adb"""
+        command = ["adb", "shell", "su", "-c"]
+        command.append(self.conf.box['rls'].format(dir_))
+
+        try:
+            if self.conf.debug:
+                print "executing", " ".join(command)
+
+            lines = subprocess.check_output(command)
+        except subprocess.CalledProcessError:
+            sys.stderr.write("Cannot read directory. Is device connected?\n")
+            return 1
+
+        lines = [l.strip() for l in lines.split('\n') if l.strip()]
+        if len(lines) == 1:
+            reg_match = self.file_re.match(lines[0])
+            entry = File(**reg_match.groupdict())
+            entry.update('/')
+
+            if entry.filepath in self.conf.dirs_to_skip:
+                return
+
+            self._entries.append(entry)
+            if entry.type == "l":
+                self._links[entry.filepath] = entry
+                self._retrieve_single_dir_list(entry.link_target)
+        else:
+            for line in lines:
+                current_dir_re = self.current_re.match(line)
+                if current_dir_re:
+                    current_dir = current_dir_re.groupdict()["dir"]
+                    if not current_dir:
+                        current_dir = "/"
+                    continue
+
+                reg_match = self.file_re.match(line)
+                if not reg_match:
+                    continue
+
+                entry = File(**reg_match.groupdict())
+                if entry.name in (".", ".."):
+                    continue
+
+                entry.update(current_dir)
+
+                if entry.filepath in self.conf.dirs_to_skip:
+                    continue
+
+                self._entries.append(entry)
+
+                if entry.type == "l":
+                    self._links[entry.filepath] = entry
+
     def _retrieve_file_list(self, root=None):
         """Retrieve file list using adb"""
         command = ["adb", "shell", "su", "-c"]
-        skip_dirs = self.conf.skip_dirs
 
         if not root:
             command.append(self.conf.box['ls'])
@@ -333,7 +388,7 @@ class Adb(object):
 
             entry.update(current_dir)
 
-            if skip_dirs and entry.filepath in self.conf.dirs_to_skip:
+            if entry.filepath in self.conf.dirs_to_skip:
                 continue
 
             self._entries.append(entry)
@@ -355,7 +410,11 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 1
 
-        self._retrieve_file_list()
+        if self.conf.root:
+            self._retrieve_single_dir_list(self.conf.root)
+        else:
+            self._retrieve_file_list()
+
         self._normalize_links()
         # with open(os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                # # "list.pcl"), "w") as fob:

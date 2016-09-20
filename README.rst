@@ -13,7 +13,9 @@ Rquirements
 * An Android device or emulator preferably rooted
 * Busybox installed and available in the path on the device
 
-Make sure, that issuing from command line::
+Make sure, that issuing from command line:
+
+.. code:: shell-session
 
    $ adb shell busybox ls
 
@@ -39,14 +41,42 @@ if needed.
 Usage
 =====
 
-To use it, just issue::
+To use it, just issue:
 
-    cd adbfs://
+.. code:: shell-session
+
+   cd adbfs://
 
 under MC - after some time you should see the files and directories on your
 device. For convenience you can add a bookmark (accessible under CTRL+\) for
 fast access. The time is depended on how many files and directories you have on
 your device and how fast it is :)
+
+Configuration
+=============
+
+You can use configure behaviour of this plugin using ``.ini`` file located under
+``$XDG_CONFIG_HOME/mc/adbfs.ini`` (which usually is located under
+``~/.config/mc/adbfs.ini``), and have default values, like:
+
+.. code:: ini
+
+   [adbfs]
+   debug = false
+   skip_dirs = true
+   dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
+   root =
+
+where:
+
+* ``debug`` will provide a little bit more verbose information, useful for
+  debugging
+* ``dirs_to_skip`` list of paths to directories which will be skipped during
+  reading. If leaved empty, or setted to empty list (``[]``) will read
+  everything (slow!)
+* ``root`` root directory to read. Everything outside of that directory will be
+  omitted. That would be the fastest way to access certain location on the
+  device. Note, that ``dirs_to_skip`` still apply inside this directory.
 
 Limitations
 ===========
