@@ -48,17 +48,17 @@ class Conf(object):
                                     r'(?P<size>\d+)?\s'
                                     r'(?P<date>\d{4}-\d{2}-\d{2}\s'
                                     r'\d{2}:\d{2})\s'
-                                    r'(?P<name>.*)'}
-            }
+                                    r'(?P<name>.*)'}}
 
     def __init__(self):
         self.box = None
         self.debug = False
         self.dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
         self.root = None
+        self.suppress_colors = False
 
-        self.get_the_box()
         self.read()
+        self.get_the_box()
 
     def get_the_box(self):
         """Detect if we dealing with busybox or toolbox"""
@@ -67,9 +67,12 @@ class Conf(object):
                 result = subprocess.check_output('adb shell which '
                                                  'busybox'.split(),
                                                  stderr=fnull)
-
             if 'busybox' in result:
                 self.box = Conf.boxes['busybox']
+                if self.suppress_colors:
+                    self.box.update({'ls': 'busybox ls --color=none -anel',
+                                     'rls': 'busybox ls --color=none '
+                                     '-Ranel {}'})
                 Adb.file_re = re.compile(self.box['file_re'])
                 return
         except subprocess.CalledProcessError:
@@ -106,6 +109,7 @@ class Conf(object):
         cfg = ConfigParser.SafeConfigParser()
         cfg_map = {'debug': (cfg.getboolean, 'debug'),
                    'dirs_to_skip': (cfg.get, 'dirs_to_skip'),
+                   'suppress_colors': (cfg.get, 'suppress_colors'),
                    'root': (cfg.get, 'root')}
         cfg.read(conf_fname)
 

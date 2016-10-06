@@ -65,6 +65,7 @@ You can use configure behaviour of this plugin using ``.ini`` file located under
    debug = false
    skip_dirs = true
    dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
+   suppress_colors = false
    root =
 
 where:
@@ -74,6 +75,9 @@ where:
 * ``dirs_to_skip`` list of paths to directories which will be skipped during
   reading. If leaved empty, or setted to empty list (``[]``) will read
   everything (slow!)
+* ``suppress_colors`` this option will make ``busybox`` not to display colors,
+  helpful, if ``busybox ls`` is configured to display colors by default. Does
+  not affect ``toolbox``.
 * ``root`` root directory to read. Everything outside of that directory will be
   omitted. That would be the fastest way to access certain location on the
   device. Note, that ``dirs_to_skip`` still apply inside this directory.
