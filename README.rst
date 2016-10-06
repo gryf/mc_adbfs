@@ -55,7 +55,7 @@ your device and how fast it is :)
 Configuration
 =============
 
-You can use configure behaviour of this plugin using ``.ini`` file located under
+You can configure behaviour of this plugin using ``.ini`` file located under
 ``$XDG_CONFIG_HOME/mc/adbfs.ini`` (which usually is located under
 ``~/.config/mc/adbfs.ini``), and have default values, like:
 
