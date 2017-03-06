@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 
-__version__ = 0.8
+__version__ = 0.9
 
 XDG_CONFIG_HOME = os.getenv("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
 
@@ -298,8 +298,12 @@ class Adb(object):
 
     def _retrieve_single_dir_list(self, dir_):
         """Retrieve file list using adb"""
-        command = ["adb", "shell", "su", "-c"]
-        command.append(self.conf.box['rls'].format(dir_))
+        if self._got_root:
+            command = ["adb", "shell", "su", "-c",
+                       self.conf.box['rls'].format(dir_)]
+        else:
+            command = ["adb", "shell"]
+            command += self.conf.box['rls'].format(dir_).split(' ')
 
         try:
             if self.conf.debug:
@@ -352,12 +356,16 @@ class Adb(object):
 
     def _retrieve_file_list(self, root=None):
         """Retrieve file list using adb"""
-        command = ["adb", "shell", "su", "-c"]
 
         if not root:
-            command.append(self.conf.box['ls'])
+            lscmd = self.conf.box['ls']
         else:
-            command.append(self.conf.box['rls'].format(root.filepath))
+            lscmd = self.conf.box['rls'].format(root.filepath)
+
+        if self._got_root:
+            command = ["adb", "shell", "su", "-c", lscmd]
+        else:
+            command = ["adb", "shell"] + lscmd.split()
 
         try:
             if self.conf.debug:
