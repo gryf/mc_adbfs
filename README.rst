@@ -9,7 +9,7 @@ Rquirements
 ===========
 
 * Python 2.7
-* ``adb`` installed and in ``$PATH``
+* ``adb`` installed and in ``$PATH`` or provided via the config file
 * An Android device or emulator preferably rooted
 * Busybox installed and available in the path on the device
 
@@ -18,6 +18,8 @@ Make sure, that issuing from command line:
 .. code:: shell-session
 
    $ adb shell busybox ls
+   $ # or in case of no PATH adb placement
+   $ /path/to/adb shell busybox ls
 
 it should display files from root directory on the device.
 
@@ -67,6 +69,7 @@ You can configure behaviour of this plugin using ``.ini`` file located under
    dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
    suppress_colors = false
    root =
+   adb_command = adb
 
 where:
 
@@ -81,6 +84,7 @@ where:
 * ``root`` root directory to read. Everything outside of that directory will be
   omitted. That would be the fastest way to access certain location on the
   device. Note, that ``dirs_to_skip`` still apply inside this directory.
+* ``adb_command`` = path to ``adb`` command.
 
 Limitations
 ===========

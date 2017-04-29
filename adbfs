@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 
-__version__ = 0.9
+__version__ = 0.10
 
 XDG_CONFIG_HOME = os.getenv('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
 
@@ -57,13 +57,14 @@ class Conf(object):
         self.dirs_to_skip = ['acct', 'charger', 'd', 'dev', 'proc', 'sys']
         self.root = None
         self.suppress_colors = False
+        self.adb_command = 'adb'
 
         self.read()
         self.get_the_box()
 
     def get_the_box(self):
         """Detect if we dealing with busybox or toolbox"""
-        cmd = 'adb shell which'.split()
+        cmd = [self.adb_command] + 'shell which'.split()
         try:
             with open(os.devnull, 'w') as fnull:
                 result = subprocess.check_output(cmd + ['busybox'],
@@ -110,7 +111,8 @@ class Conf(object):
         cfg_map = {'debug': (cfg.getboolean, 'debug'),
                    'dirs_to_skip': (cfg.get, 'dirs_to_skip'),
                    'suppress_colors': (cfg.get, 'suppress_colors'),
-                   'root': (cfg.get, 'root')}
+                   'root': (cfg.get, 'root'),
+                   'adb_command': (cfg.get, 'adb')}
         cfg.read(conf_fname)
 
         for key, (function, attr) in cfg_map.items():
@@ -124,6 +126,10 @@ class Conf(object):
             self.dirs_to_skip = [x.encode('utf-8') for x in self.dirs_to_skip]
         else:
             self.dirs_to_skip = []
+
+        if self.adb_command:
+            self.adb_command = os.path.expandvars(self.adb_command)
+            self.adb_command = os.path.expanduser(self.adb_command)
 
 
 class File(object):
@@ -250,7 +256,7 @@ class Adb(object):
 
     def __su_check(self):
         """Check if we are able to get elevated privileges"""
-        cmd = 'adb shell su -c whoami'.split()
+        cmd = [self.conf.adb_command] + 'shell su -c whoami'.split()
         try:
             with open(os.devnull, 'w') as fnull:
                 result = subprocess.check_output(cmd, stderr=fnull)
@@ -303,7 +309,7 @@ class Adb(object):
         lscmd = self.conf.box['rls'].format(dir_)
         if self._got_root:
             lscmd = 'su -c "{}"'.format(lscmd)
-        command = ['adb', 'shell', lscmd]
+        command = [self.conf.adb_command, 'shell', lscmd]
 
         try:
             if self.conf.debug:
@@ -365,7 +371,7 @@ class Adb(object):
         if self._got_root:
             lscmd = 'su -c "{}"'.format(lscmd)
 
-        command = ['adb', 'shell', lscmd]
+        command = [self.conf.adb_command, 'shell', lscmd]
 
         try:
             if self.conf.debug:
@@ -433,7 +439,7 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 1
 
-        cmd = ['adb', 'pull', src, dst]
+        cmd = [self.conf.adb_command, 'pull', src, dst]
         if self.conf.debug:
             sys.stderr.write(' '.join(cmd) + '\n')
 
@@ -454,7 +460,7 @@ class Adb(object):
         if not dst.startswith('/'):
             dst = '/' + dst
 
-        cmd = ['adb', 'push', src, dst]
+        cmd = [self.conf.adb_command, 'push', src, dst]
         if self.conf.debug:
             sys.stderr.write(' '.join(cmd) + '\n')
 
@@ -477,7 +483,7 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 1
 
-        cmd = ['adb', 'shell', 'rm', dst]
+        cmd = [self.conf.adb_command, 'shell', 'rm', dst]
         try:
             err = subprocess.check_output(cmd)
         except subprocess.CalledProcessError:
@@ -495,7 +501,7 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 1
 
-        cmd = ['adb', 'shell', 'rm', '-r', dst]
+        cmd = [self.conf.adb_command, 'shell', 'rm', '-r', dst]
         try:
             err = subprocess.check_output(cmd)
         except subprocess.CalledProcessError:
@@ -516,7 +522,7 @@ class Adb(object):
         if not dst.startswith('/'):
             dst = '/' + dst
 
-        cmd = ['adb', 'shell', 'mkdir', dst]
+        cmd = [self.conf.adb_command, 'shell', 'mkdir', dst]
         try:
             err = subprocess.check_output(cmd)
         except subprocess.CalledProcessError:
