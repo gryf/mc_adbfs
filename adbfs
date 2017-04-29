@@ -63,10 +63,10 @@ class Conf(object):
 
     def get_the_box(self):
         """Detect if we dealing with busybox or toolbox"""
+        cmd = 'adb shell which'.split()
         try:
             with open(os.devnull, 'w') as fnull:
-                result = subprocess.check_output('adb shell which '
-                                                 'busybox'.split(),
+                result = subprocess.check_output(cmd + ['busybox'],
                                                  stderr=fnull)
             if 'busybox' in result:
                 self.box = Conf.boxes['busybox']
@@ -81,8 +81,7 @@ class Conf(object):
 
         try:
             with open(os.devnull, 'w') as fnull:
-                result = subprocess.check_output('adb shell which '
-                                                 'toolbox'.split(),
+                result = subprocess.check_output(cmd + ['toolbox'],
                                                  stderr=fnull)
 
             if 'toolbox' in result:
@@ -251,11 +250,10 @@ class Adb(object):
 
     def __su_check(self):
         """Check if we are able to get elevated privileges"""
+        cmd = 'adb shell su -c whoami'.split()
         try:
             with open(os.devnull, 'w') as fnull:
-                result = subprocess.check_output('adb shell su -c '
-                                                 'whoami'.split(),
-                                                 stderr=fnull)
+                result = subprocess.check_output(cmd, stderr=fnull)
 
         except subprocess.CalledProcessError:
             return
@@ -302,12 +300,10 @@ class Adb(object):
 
     def _retrieve_single_dir_list(self, dir_):
         """Retrieve file list using adb"""
+        lscmd = self.conf.box['rls'].format(dir_)
         if self._got_root:
-            command = ['adb', 'shell', 'su', '-c',
-                       self.conf.box['rls'].format(dir_)]
-        else:
-            command = ['adb', 'shell']
-            command += self.conf.box['rls'].format(dir_).split(' ')
+            lscmd = 'su -c "{}"'.format(lscmd)
+        command = ['adb', 'shell', lscmd]
 
         try:
             if self.conf.debug:
@@ -367,9 +363,9 @@ class Adb(object):
             lscmd = self.conf.box['rls'].format(root.filepath)
 
         if self._got_root:
-            command = ['adb', 'shell', 'su', '-c', lscmd]
-        else:
-            command = ['adb', 'shell'] + lscmd.split()
+            lscmd = 'su -c "{}"'.format(lscmd)
+
+        command = ['adb', 'shell', lscmd]
 
         try:
             if self.conf.debug:
