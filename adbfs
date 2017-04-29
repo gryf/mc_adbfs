@@ -18,7 +18,7 @@ import sys
 
 __version__ = 0.9
 
-XDG_CONFIG_HOME = os.getenv("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+XDG_CONFIG_HOME = os.getenv('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
 
 
 class NoBoxFoundException(OSError):
@@ -27,6 +27,7 @@ class NoBoxFoundException(OSError):
     filesystem accessed via adb
     """
     pass
+
 
 class Conf(object):
     """Simple config parser"""
@@ -53,7 +54,7 @@ class Conf(object):
     def __init__(self):
         self.box = None
         self.debug = False
-        self.dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
+        self.dirs_to_skip = ['acct', 'charger', 'd', 'dev', 'proc', 'sys']
         self.root = None
         self.suppress_colors = False
 
@@ -63,7 +64,7 @@ class Conf(object):
     def get_the_box(self):
         """Detect if we dealing with busybox or toolbox"""
         try:
-            with open(os.devnull, "w") as fnull:
+            with open(os.devnull, 'w') as fnull:
                 result = subprocess.check_output('adb shell which '
                                                  'busybox'.split(),
                                                  stderr=fnull)
@@ -72,14 +73,14 @@ class Conf(object):
                 if self.suppress_colors:
                     self.box.update({'ls': 'busybox ls --color=none -anel',
                                      'rls': 'busybox ls --color=none '
-                                     '-Ranel {}'})
+                                            '-Ranel {}'})
                 Adb.file_re = re.compile(self.box['file_re'])
                 return
         except subprocess.CalledProcessError:
             pass
 
         try:
-            with open(os.devnull, "w") as fnull:
+            with open(os.devnull, 'w') as fnull:
                 result = subprocess.check_output('adb shell which '
                                                  'toolbox'.split(),
                                                  stderr=fnull)
@@ -92,7 +93,7 @@ class Conf(object):
             pass
 
         raise NoBoxFoundException(errno.ENOENT,
-                                  "There is no toolbox or busybox available")
+                                  'There is no toolbox or busybox available')
 
     def read(self):
         """
@@ -120,7 +121,7 @@ class Conf(object):
                 pass
 
         if self.dirs_to_skip and isinstance(self.dirs_to_skip, str):
-            self.dirs_to_skip = json.loads(self.dirs_to_skip, encoding="ascii")
+            self.dirs_to_skip = json.loads(self.dirs_to_skip, encoding='ascii')
             self.dirs_to_skip = [x.encode('utf-8') for x in self.dirs_to_skip]
         else:
             self.dirs_to_skip = []
@@ -140,7 +141,7 @@ class File(object):
         self.name = name
         self.date = date  # as string
 
-        self.dirname = ""
+        self.dirname = ''
         self.type = None
         self.string = None
         self.link_target = None
@@ -149,7 +150,7 @@ class File(object):
     def _correct_link(self):
         """Canonize filename and fill the link attr"""
         try:
-            name, target = self.name.split(" -> ")
+            name, target = self.name.split(' -> ')
         except ValueError:
             return
 
@@ -158,7 +159,7 @@ class File(object):
         if not self.size:
             self.size = 0
 
-        if target.startswith("/"):
+        if target.startswith('/'):
             self.link_target = target
         else:
             self.link_target = os.path.abspath(os.path.join(self.dirname,
@@ -166,34 +167,34 @@ class File(object):
 
     def update(self, dirname):
         """update object fields"""
-        month_num = {"Jan": 1,
-                     "Feb": 2,
-                     "Mar": 3,
-                     "Apr": 4,
-                     "May": 5,
-                     "Jun": 6,
-                     "Jul": 7,
-                     "Aug": 8,
-                     "Sep": 9,
-                     "Oct": 10,
-                     "Nov": 11,
-                     "Dec": 12}
+        month_num = {'Jan': 1,
+                     'Feb': 2,
+                     'Mar': 3,
+                     'Apr': 4,
+                     'May': 5,
+                     'Jun': 6,
+                     'Jul': 7,
+                     'Aug': 8,
+                     'Sep': 9,
+                     'Oct': 10,
+                     'Nov': 11,
+                     'Dec': 12}
         self.dirname = dirname
         if self.date_time:
             date = self.date_time.split()
-            date = "%s-%02d-%s %s" % (date[1],
+            date = '%s-%02d-%s %s' % (date[1],
                                       month_num[date[0]],
                                       date[3],
                                       date[2])
-            date = datetime.strptime(date, "%d-%m-%Y %H:%M:%S")
+            date = datetime.strptime(date, '%d-%m-%Y %H:%M:%S')
         elif self.date:
-            date = datetime.strptime(self.date, "%Y-%m-%d %H:%M")
+            date = datetime.strptime(self.date, '%Y-%m-%d %H:%M')
 
-        self.date_time = date.strftime("%m/%d/%Y %H:%M:01")
+        self.date_time = date.strftime('%m/%d/%Y %H:%M:01')
 
         self.type = self.perms[0] if self.perms else None
 
-        if self.type == "l" and " -> " in self.name:
+        if self.type == 'l' and ' -> ' in self.name:
             self._correct_link()
 
         self.filepath = os.path.join(self.dirname, self.name)
@@ -206,22 +207,22 @@ class File(object):
         """represent the file/entire node"""
         fullname = os.path.join(self.dirname, self.name)
         if self.link_target:
-            fullname += " -> " + self.link_target
-        return "<File {type} {name} {id}>".format(type=self.type,
+            fullname += ' -> ' + self.link_target
+        return '<File {type} {name} {id}>'.format(type=self.type,
                                                   name=fullname,
                                                   id=hex(id(self)))
 
     def __str__(self):
         """display the file/entire node"""
-        template = ("{perms} {links:>4} {uid:<8} {gid:<8} {size:>8} "
-                    "{date_time} {fullname}\n")
+        template = ('{perms} {links:>4} {uid:<8} {gid:<8} {size:>8} '
+                    '{date_time} {fullname}\n')
 
         if not self.name:
-            return ""
+            return ''
 
         fullname = os.path.join(self.dirname, self.name)
         if self.link_target:
-            fullname += " -> " + self.link_target
+            fullname += ' -> ' + self.link_target
 
         return template.format(perms=self.perms,
                                links=self.links,
@@ -235,7 +236,7 @@ class File(object):
 class Adb(object):
     """Class for interact with android rooted device through adb"""
     file_re = None
-    current_re = re.compile(r"^(\./)?(?P<dir>.+):$")
+    current_re = re.compile(r'^(\./)?(?P<dir>.+):$')
 
     def __init__(self):
         """Prepare archive content for operations"""
@@ -251,7 +252,7 @@ class Adb(object):
     def __su_check(self):
         """Check if we are able to get elevated privileges"""
         try:
-            with open(os.devnull, "w") as fnull:
+            with open(os.devnull, 'w') as fnull:
                 result = subprocess.check_output('adb shell su -c '
                                                  'whoami'.split(),
                                                  stderr=fnull)
@@ -261,7 +262,6 @@ class Adb(object):
 
         if 'root' in result:
             self._got_root = True
-            return
 
     def _find_target(self, needle):
         """Find link target"""
@@ -303,19 +303,19 @@ class Adb(object):
     def _retrieve_single_dir_list(self, dir_):
         """Retrieve file list using adb"""
         if self._got_root:
-            command = ["adb", "shell", "su", "-c",
+            command = ['adb', 'shell', 'su', '-c',
                        self.conf.box['rls'].format(dir_)]
         else:
-            command = ["adb", "shell"]
+            command = ['adb', 'shell']
             command += self.conf.box['rls'].format(dir_).split(' ')
 
         try:
             if self.conf.debug:
-                print "executing", " ".join(command)
+                print 'executing', ' '.join(command)
 
             lines = subprocess.check_output(command)
         except subprocess.CalledProcessError:
-            sys.stderr.write("Cannot read directory. Is device connected?\n")
+            sys.stderr.write('Cannot read directory. Is device connected?\n')
             return 1
 
         lines = [l.strip() for l in lines.split('\n') if l.strip()]
@@ -328,16 +328,16 @@ class Adb(object):
                 return
 
             self._entries.append(entry)
-            if entry.type == "l":
+            if entry.type == 'l':
                 self._links[entry.filepath] = entry
                 self._retrieve_single_dir_list(entry.link_target)
         else:
             for line in lines:
                 current_dir_re = self.current_re.match(line)
                 if current_dir_re:
-                    current_dir = current_dir_re.groupdict()["dir"]
+                    current_dir = current_dir_re.groupdict()['dir']
                     if not current_dir:
-                        current_dir = "/"
+                        current_dir = '/'
                     continue
 
                 reg_match = self.file_re.match(line)
@@ -345,7 +345,7 @@ class Adb(object):
                     continue
 
                 entry = File(**reg_match.groupdict())
-                if entry.name in (".", ".."):
+                if entry.name in ('.', '..'):
                     continue
 
                 entry.update(current_dir)
@@ -355,7 +355,7 @@ class Adb(object):
 
                 self._entries.append(entry)
 
-                if entry.type == "l":
+                if entry.type == 'l':
                     self._links[entry.filepath] = entry
 
     def _retrieve_file_list(self, root=None):
@@ -367,27 +367,27 @@ class Adb(object):
             lscmd = self.conf.box['rls'].format(root.filepath)
 
         if self._got_root:
-            command = ["adb", "shell", "su", "-c", lscmd]
+            command = ['adb', 'shell', 'su', '-c', lscmd]
         else:
-            command = ["adb", "shell"] + lscmd.split()
+            command = ['adb', 'shell'] + lscmd.split()
 
         try:
             if self.conf.debug:
-                print "executing", " ".join(command)
+                print 'executing', ' '.join(command)
 
             lines = subprocess.check_output(command)
         except subprocess.CalledProcessError:
-            sys.stderr.write("Cannot read directory. Is device connected?\n")
+            sys.stderr.write('Cannot read directory. Is device connected?\n')
             return 1
 
-        current_dir = root.dirname if root else "/"
-        for line in lines.split("\n"):
+        current_dir = root.dirname if root else '/'
+        for line in lines.split('\n'):
             line = line.strip()
             current_dir_re = self.current_re.match(line)
             if current_dir_re:
-                current_dir = current_dir_re.groupdict()["dir"]
+                current_dir = current_dir_re.groupdict()['dir']
                 if not current_dir:
-                    current_dir = "/"
+                    current_dir = '/'
                 continue
 
             reg_match = self.file_re.match(line)
@@ -395,7 +395,7 @@ class Adb(object):
                 continue
 
             entry = File(**reg_match.groupdict())
-            if entry.name in (".", ".."):
+            if entry.name in ('.', '..'):
                 continue
 
             entry.update(current_dir)
@@ -404,16 +404,16 @@ class Adb(object):
                 continue
 
             self._entries.append(entry)
-            if root is None and entry.type == "d":
+            if root is None and entry.type == 'd':
                 self._retrieve_file_list(entry)
 
-            if entry.type == "l":
+            if entry.type == 'l':
                 self._links[entry.filepath] = entry
 
     def run(self, fname):
         """Not supported"""
-        sys.stderr.write("Not supported - or maybe you are on compatible "
-                         "architecture?\n")
+        sys.stderr.write('Not supported - or maybe you are on compatible '
+                         'architecture?\n')
         return 1
 
     def list(self):
@@ -428,13 +428,7 @@ class Adb(object):
             self._retrieve_file_list()
 
         self._normalize_links()
-        # with open(os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                               # # "list.pcl"), "w") as fob:
-                               # "list.pcl")) as fob:
-            # import cPickle
-            # # cPickle.dump(self._entries, fob)
-            # self._entries = cPickle.load(fob)
-        sys.stdout.write("".join([str(entry) for entry in self._entries]))
+        sys.stdout.write(''.join([str(entry) for entry in self._entries]))
         return 0
 
     def copyout(self, src, dst):
@@ -443,11 +437,11 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 1
 
-        cmd = ["adb", "pull", src, dst]
+        cmd = ['adb', 'pull', src, dst]
         if self.conf.debug:
-            sys.stderr.write(" ".join(cmd) + "\n")
+            sys.stderr.write(' '.join(cmd) + '\n')
 
-        with open(os.devnull, "w") as fnull:
+        with open(os.devnull, 'w') as fnull:
             try:
                 err = subprocess.call(cmd, stdout=fnull, stderr=fnull)
             except subprocess.CalledProcessError:
@@ -461,15 +455,14 @@ class Adb(object):
         if self.error:
             sys.stderr.write(self.error)
             return 1
-        if not dst.startswith("/"):
-            dst = "/" + dst
+        if not dst.startswith('/'):
+            dst = '/' + dst
 
-        # cmd = ["adb", "push", pipes.quote(src), pipes.quote(dst)]
-        cmd = ["adb", "push", src, dst]
+        cmd = ['adb', 'push', src, dst]
         if self.conf.debug:
-            sys.stderr.write(" ".join(cmd) + "\n")
+            sys.stderr.write(' '.join(cmd) + '\n')
 
-        with open(os.devnull, "w") as fnull:
+        with open(os.devnull, 'w') as fnull:
             try:
                 err = subprocess.call(cmd, stdout=fnull, stderr=fnull)
             except subprocess.CalledProcessError:
@@ -477,8 +470,8 @@ class Adb(object):
                 return 1
 
         if err != 0:
-            sys.stderr.write("Cannot push the file, "
-                             "%s, error %d" % (dst, err))
+            sys.stderr.write('Cannot push the file, '
+                             '%s, error %d' % (dst, err))
             return 1
         return 0
 
@@ -488,14 +481,14 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 1
 
-        cmd = ["adb", "shell", "rm", dst]
+        cmd = ['adb', 'shell', 'rm', dst]
         try:
             err = subprocess.check_output(cmd)
         except subprocess.CalledProcessError:
             sys.stderr.write('Error executing adb shell')
             return 1
 
-        if err != "":
+        if err != '':
             sys.stderr.write(err)
             return 1
         return 0
@@ -506,14 +499,14 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 1
 
-        cmd = ["adb", "shell", "rm", "-r", dst]
+        cmd = ['adb', 'shell', 'rm', '-r', dst]
         try:
             err = subprocess.check_output(cmd)
         except subprocess.CalledProcessError:
             sys.stderr.write('Error executing adb shell')
             return 1
 
-        if err != "":
+        if err != '':
             sys.stderr.write(err)
             return 1
         return 0
@@ -524,17 +517,17 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 1
 
-        if not dst.startswith("/"):
-            dst = "/" + dst
+        if not dst.startswith('/'):
+            dst = '/' + dst
 
-        cmd = ["adb", "shell", "mkdir", dst]
+        cmd = ['adb', 'shell', 'mkdir', dst]
         try:
             err = subprocess.check_output(cmd)
         except subprocess.CalledProcessError:
             sys.stderr.write('Error executing adb shell')
             return 1
 
-        if err != "":
+        if err != '':
             sys.stderr.write(err)
             return 1
         return 0
@@ -598,5 +591,5 @@ def main():
     return args.func(args)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main())
