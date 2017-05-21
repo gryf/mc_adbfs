@@ -9,7 +9,6 @@ adbfs Virtual filesystem for Midnight Commander
 import ConfigParser
 import argparse
 from datetime import datetime
-import errno
 import json
 import os
 import re
@@ -92,8 +91,8 @@ class Conf(object):
         except subprocess.CalledProcessError:
             pass
 
-        raise NoBoxFoundException(errno.ENOENT,
-                                  'There is no toolbox or busybox available')
+        sys.stderr.write('There is no toolbox or busybox available.\n')
+        sys.exit(1)
 
     def read(self):
         """
@@ -112,7 +111,7 @@ class Conf(object):
                    'dirs_to_skip': (cfg.get, 'dirs_to_skip'),
                    'suppress_colors': (cfg.get, 'suppress_colors'),
                    'root': (cfg.get, 'root'),
-                   'adb_command': (cfg.get, 'adb')}
+                   'adb_command': (cfg.get, 'adb_command')}
         cfg.read(conf_fname)
 
         for key, (function, attr) in cfg_map.items():
