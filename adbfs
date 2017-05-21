@@ -57,8 +57,10 @@ class Conf(object):
         self.root = None
         self.suppress_colors = False
         self.adb_command = 'adb'
+        self.adb_connect = ''
 
         self.read()
+        self.connect()
         self.get_the_box()
 
     def get_the_box(self):
@@ -94,6 +96,54 @@ class Conf(object):
         sys.stderr.write('There is no toolbox or busybox available.\n')
         sys.exit(1)
 
+    def get_attached_devices(self):
+        """Return a list of attached devices"""
+        cmd = [self.adb_command, 'devices']
+        devices = []
+
+        try:
+            with open(os.devnull, 'w') as fnull:
+                result = subprocess.check_output(cmd, stderr=fnull)
+        except subprocess.CalledProcessError:
+            result = ''
+
+        for line in result.split('\n'):
+            if line.startswith('*'):
+                continue
+            if line.strip() == 'List of devices attached':
+                continue
+            if line.strip() == '':
+                continue
+            identifier, _ = line.split()
+            devices.append(identifier)
+
+        return devices
+
+    def connect(self):
+        """
+        If adb_connect is non empty string, perform connecting to specified
+        device over network using an address (or hostname).
+        """
+        if not self.adb_connect:
+            return
+
+        devices = self.get_attached_devices()
+
+        for device in devices:
+            if self.adb_connect in device:
+                return  # already connected, no need to reconnect
+
+        cmd = [self.adb_command, 'connect', self.adb_connect]
+        with open(os.devnull, 'w') as fnull:
+            result = subprocess.check_output(cmd, stderr=fnull)
+        if result.split()[0] == 'connected':
+            subprocess.call([self.adb_command, 'wait-for-device'])
+            return
+
+        sys.stderr.write('Unable to connect to `%s\'. Is adb over network '
+                         'enabled on device?\n' % self.adb_connect)
+        sys.exit(2)
+
     def read(self):
         """
         Read config file and change the options according to values from that
@@ -111,7 +161,8 @@ class Conf(object):
                    'dirs_to_skip': (cfg.get, 'dirs_to_skip'),
                    'suppress_colors': (cfg.get, 'suppress_colors'),
                    'root': (cfg.get, 'root'),
-                   'adb_command': (cfg.get, 'adb_command')}
+                   'adb_command': (cfg.get, 'adb_command'),
+                   'adb_connect': (cfg.get, 'adb_connect')}
         cfg.read(conf_fname)
 
         for key, (function, attr) in cfg_map.items():

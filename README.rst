@@ -70,6 +70,8 @@ You can configure behaviour of this plugin using ``.ini`` file located under
    suppress_colors = false
    root =
    adb_command = adb
+   adb_connect =
+
 
 where:
 
@@ -84,7 +86,12 @@ where:
 * ``root`` root directory to read. Everything outside of that directory will be
   omitted. That would be the fastest way to access certain location on the
   device. Note, that ``dirs_to_skip`` still apply inside this directory.
-* ``adb_command`` = path to ``adb`` command.
+* ``adb_command`` absolute or relative path to ``adb`` command. `~/` or
+  environment variables are allowed.
+* ``adb_connect`` specifies if connection to specific device needs to be
+  performed before accessing shell. It is usefull for *adb over network*
+  feature. Typical value here is a device IP address with optional port, which
+  defaults to 5555.
 
 Limitations
 ===========
