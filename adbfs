@@ -48,7 +48,17 @@ class Conf(object):
                                     r'(?P<size>\d+)?\s'
                                     r'(?P<date>\d{4}-\d{2}-\d{2}\s'
                                     r'\d{2}:\d{2})\s'
-                                    r'(?P<name>.*)'}}
+                                    r'(?P<name>.*)'},
+             'toybox': {'ls': 'toybox ls -anl',
+                        'rls':  'toybox ls -Ranl {}',
+                        'file_re': r'^(?P<perms>[-bcdlps][-rwxsStT]{9})\s+'
+                                   r'(?P<links>\d+)\s+'
+                                   r'(?P<uid>\d+)\s+'
+                                   r'(?P<gid>\d+)\s+'
+                                   r'(?P<size>\d+)?\s'
+                                   r'(?P<date>\d{4}-\d{2}-\d{2}\s'
+                                   r'\d{2}:\d{2})\s'
+                                   r'(?P<name>.*)'}}
 
     def __init__(self):
         self.box = None
@@ -76,6 +86,18 @@ class Conf(object):
                     self.box.update({'ls': 'busybox ls --color=none -anel',
                                      'rls': 'busybox ls --color=none '
                                             '-Ranel {}'})
+                Adb.file_re = re.compile(self.box['file_re'])
+                return
+        except subprocess.CalledProcessError:
+            pass
+
+        try:
+            with open(os.devnull, 'w') as fnull:
+                result = subprocess.check_output(cmd + ['toybox'],
+                                                 stderr=fnull)
+
+            if 'toybox' in result:
+                self.box = Conf.boxes['toybox']
                 Adb.file_re = re.compile(self.box['file_re'])
                 return
         except subprocess.CalledProcessError:

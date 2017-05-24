@@ -11,7 +11,8 @@ Rquirements
 * Python 2.7
 * ``adb`` installed and in ``$PATH`` or provided via the config file
 * An Android device or emulator preferably rooted
-* Busybox installed and available in the path on the device
+* ``busybox`` (``toolbox``, ``toybox``) installed and available in the path on
+  the device
 
 Make sure, that issuing from command line:
 
@@ -82,14 +83,14 @@ where:
   everything (slow!)
 * ``suppress_colors`` this option will make ``busybox`` not to display colors,
   helpful, if ``busybox ls`` is configured to display colors by default. Does
-  not affect ``toolbox``.
+  not affect ``toolbox`` or ``toybox``.
 * ``root`` root directory to read. Everything outside of that directory will be
   omitted. That would be the fastest way to access certain location on the
   device. Note, that ``dirs_to_skip`` still apply inside this directory.
 * ``adb_command`` absolute or relative path to ``adb`` command. `~/` or
   environment variables are allowed.
 * ``adb_connect`` specifies if connection to specific device needs to be
-  performed before accessing shell. It is usefull for *adb over network*
+  performed before accessing shell. It is useful for *adb over network*
   feature. Typical value here is a device IP address with optional port, which
   defaults to 5555.
 
