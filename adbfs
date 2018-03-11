@@ -5,8 +5,10 @@ adbfs Virtual filesystem for Midnight Commander
 * Copyright (c) 2016, Roman Dobosz,
 * Published under 3-clause BSD-style license (see LICENSE file)
 """
-
-import ConfigParser
+try:
+    import ConfigParser as configparser
+except ImportError:
+    import configparser
 import argparse
 from datetime import datetime
 import json
@@ -15,9 +17,21 @@ import re
 import subprocess
 import sys
 
-__version__ = 0.10
+__version__ = 0.11
 
 XDG_CONFIG_HOME = os.getenv('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
+
+
+def check_output(command_list, stderr=None):
+    """
+    For some reason, in py3 it was decided that command output should be bytes
+    instead of string. This little function will check if we have string or
+    bytes and in case of bytes it will convert it to string.
+    """
+    result = subprocess.check_output(command_list, stderr=stderr)
+    if not isinstance(result, str):
+        result = result.decode('utf-8')
+    return result
 
 
 class NoBoxFoundException(OSError):
@@ -78,8 +92,7 @@ class Conf(object):
         cmd = [self.adb_command] + 'shell which'.split()
         try:
             with open(os.devnull, 'w') as fnull:
-                result = subprocess.check_output(cmd + ['busybox'],
-                                                 stderr=fnull)
+                result = check_output(cmd + ['busybox'], stderr=fnull)
             if 'busybox' in result:
                 self.box = Conf.boxes['busybox']
                 if self.suppress_colors:
@@ -93,8 +106,7 @@ class Conf(object):
 
         try:
             with open(os.devnull, 'w') as fnull:
-                result = subprocess.check_output(cmd + ['toybox'],
-                                                 stderr=fnull)
+                result = check_output(cmd + ['toybox'], stderr=fnull)
 
             if 'toybox' in result:
                 self.box = Conf.boxes['toybox']
@@ -105,8 +117,7 @@ class Conf(object):
 
         try:
             with open(os.devnull, 'w') as fnull:
-                result = subprocess.check_output(cmd + ['toolbox'],
-                                                 stderr=fnull)
+                result = check_output(cmd + ['toolbox'], stderr=fnull)
 
             if 'toolbox' in result:
                 self.box = Conf.boxes['toolbox']
@@ -125,7 +136,7 @@ class Conf(object):
 
         try:
             with open(os.devnull, 'w') as fnull:
-                result = subprocess.check_output(cmd, stderr=fnull)
+                result = check_output(cmd, stderr=fnull)
         except subprocess.CalledProcessError:
             result = ''
 
@@ -157,7 +168,7 @@ class Conf(object):
 
         cmd = [self.adb_command, 'connect', self.adb_connect]
         with open(os.devnull, 'w') as fnull:
-            result = subprocess.check_output(cmd, stderr=fnull)
+            result = check_output(cmd, stderr=fnull)
         if result.split()[0] == 'connected':
             subprocess.call([self.adb_command, 'wait-for-device'])
             return
@@ -178,7 +189,7 @@ class Conf(object):
         if not os.path.exists(conf_fname):
             return
 
-        cfg = ConfigParser.SafeConfigParser()
+        cfg = configparser.SafeConfigParser()
         cfg_map = {'debug': (cfg.getboolean, 'debug'),
                    'dirs_to_skip': (cfg.get, 'dirs_to_skip'),
                    'suppress_colors': (cfg.get, 'suppress_colors'),
@@ -190,7 +201,7 @@ class Conf(object):
         for key, (function, attr) in cfg_map.items():
             try:
                 setattr(self, attr, function('adbfs', key))
-            except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
+            except (configparser.NoSectionError, configparser.NoOptionError):
                 pass
 
         if self.dirs_to_skip and isinstance(self.dirs_to_skip, str):
@@ -331,7 +342,7 @@ class Adb(object):
         cmd = [self.conf.adb_command] + 'shell su -c whoami'.split()
         try:
             with open(os.devnull, 'w') as fnull:
-                result = subprocess.check_output(cmd, stderr=fnull)
+                result = check_output(cmd, stderr=fnull)
 
         except subprocess.CalledProcessError:
             return
@@ -385,9 +396,9 @@ class Adb(object):
 
         try:
             if self.conf.debug:
-                print 'executing', ' '.join(command)
+                print('executing', ' '.join(command))
 
-            lines = subprocess.check_output(command)
+            lines = check_output(command)
         except subprocess.CalledProcessError:
             sys.stderr.write('Cannot read directory. Is device connected?\n')
             return 1
@@ -447,9 +458,9 @@ class Adb(object):
 
         try:
             if self.conf.debug:
-                print 'executing', ' '.join(command)
+                print('executing', ' '.join(command))
 
-            lines = subprocess.check_output(command)
+            lines = check_output(command)
         except subprocess.CalledProcessError:
             sys.stderr.write('Cannot read directory. Is device connected?\n')
             return 1
@@ -557,7 +568,7 @@ class Adb(object):
 
         cmd = [self.conf.adb_command, 'shell', 'rm', dst]
         try:
-            err = subprocess.check_output(cmd)
+            err = check_output(cmd)
         except subprocess.CalledProcessError:
             sys.stderr.write('Error executing adb shell')
             return 1
@@ -575,7 +586,7 @@ class Adb(object):
 
         cmd = [self.conf.adb_command, 'shell', 'rm', '-r', dst]
         try:
-            err = subprocess.check_output(cmd)
+            err = check_output(cmd)
         except subprocess.CalledProcessError:
             sys.stderr.write('Error executing adb shell')
             return 1
@@ -596,7 +607,7 @@ class Adb(object):
 
         cmd = [self.conf.adb_command, 'shell', 'mkdir', dst]
         try:
-            err = subprocess.check_output(cmd)
+            err = check_output(cmd)
         except subprocess.CalledProcessError:
             sys.stderr.write('Error executing adb shell')
             return 1
