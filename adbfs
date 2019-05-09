@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+import shlex
 
 __version__ = 0.11
 
@@ -337,9 +338,16 @@ class Adb(object):
 
         self.__su_check()
 
+    def _shell_cmd(self, *args, with_root=False):
+        if with_root and self._got_root:
+            args = ('su', '-c', shlex.quote(' '.join(shlex.quote(x) for x in args)))
+
+        cmd = [self.conf.adb_command, 'shell'] + [shlex.quote(x) for x in args]
+        return cmd
+
     def __su_check(self):
         """Check if we are able to get elevated privileges"""
-        cmd = [self.conf.adb_command] + 'shell su -c whoami'.split()
+        cmd = self._shell_cmd('su', '-c', 'whoami')
         try:
             with open(os.devnull, 'w') as fnull:
                 result = check_output(cmd, stderr=fnull)
@@ -389,10 +397,8 @@ class Adb(object):
 
     def _retrieve_single_dir_list(self, dir_):
         """Retrieve file list using adb"""
-        lscmd = self.conf.box['rls'].format(dir_)
-        if self._got_root:
-            lscmd = 'su -c "{}"'.format(lscmd)
-        command = [self.conf.adb_command, 'shell', lscmd]
+        lscmd = self.conf.box['rls'].format(shlex.quote(dir_))
+        command = self._shell_cmd(*shlex.split(lscmd), with_root=True)
 
         try:
             if self.conf.debug:
@@ -449,12 +455,9 @@ class Adb(object):
         if not root:
             lscmd = self.conf.box['ls']
         else:
-            lscmd = self.conf.box['rls'].format(root.filepath)
+            lscmd = self.conf.box['rls'].format(shlex.quite(root.filepath))
 
-        if self._got_root:
-            lscmd = 'su -c "{}"'.format(lscmd)
-
-        command = [self.conf.adb_command, 'shell', lscmd]
+        command = self._shell_cmd(*shlex.split(lscmd), with_root=True)
 
         try:
             if self.conf.debug:
@@ -566,7 +569,7 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 1
 
-        cmd = [self.conf.adb_command, 'shell', 'rm', dst]
+        cmd = self._shell_cmd('rm', dst)
         try:
             err = check_output(cmd)
         except subprocess.CalledProcessError:
@@ -584,7 +587,7 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 1
 
-        cmd = [self.conf.adb_command, 'shell', 'rm', '-r', dst]
+        cmd = self._shell_cmd('rm', '-r', dst)
         try:
             err = check_output(cmd)
         except subprocess.CalledProcessError:
@@ -605,7 +608,7 @@ class Adb(object):
         if not dst.startswith('/'):
             dst = '/' + dst
 
-        cmd = [self.conf.adb_command, 'shell', 'mkdir', dst]
+        cmd = self._shell_cmd('mkdir', dst)
         try:
             err = check_output(cmd)
         except subprocess.CalledProcessError:
