@@ -34,14 +34,6 @@ def check_output(command_list, stderr=None):
     return result
 
 
-class NoBoxFoundException(OSError):
-    """
-    Exception raised in case of not found either toolbox or busybox on remote
-    filesystem accessed via adb
-    """
-    pass
-
-
 class Conf(object):
     """Simple config parser"""
     boxes = {'busybox': {'ls': 'busybox ls -anel',

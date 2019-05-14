@@ -66,7 +66,6 @@ You can configure behaviour of this plugin using ``.ini`` file located under
 
    [adbfs]
    debug = false
-   skip_dirs = true
    dirs_to_skip = ["acct", "charger", "d", "dev", "proc", "sys"]
    suppress_colors = false
    root =
