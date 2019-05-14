@@ -5,6 +5,7 @@ Midnight Commander adbfs external fs plugin
 This is Midnight Commander extfs plugin for browsing Android device through
 ``adb`` interface written in Python.
 
+
 Rquirements
 ===========
 
@@ -24,6 +25,7 @@ Make sure, that issuing from command line:
 
 it should display files from root directory on the device.
 
+
 Features
 ========
 
@@ -35,11 +37,13 @@ Features
 * Symbolic links in lists are corrected to be relative to the file system
 * Symbolic links also point to the right target, skipping intermediate links
 
+
 Installation
 ============
 
 Copy adbfs into ``~/.local/share/mc/extfs.d/`` directory and make it executable
 if needed.
+
 
 Usage
 =====
@@ -48,12 +52,13 @@ To use it, just issue:
 
 .. code:: shell-session
 
-   cd adbfs://
+   $ cd adbfs://
 
 under MC - after some time you should see the files and directories on your
-device. For convenience you can add a bookmark (accessible under CTRL+\) for
+device. For convenience you can add a bookmark (accessible under CTRL+\\) for
 fast access. The time is depended on how many files and directories you have on
 your device and how fast it is :)
+
 
 Configuration
 =============
@@ -71,7 +76,6 @@ You can configure behaviour of this plugin using ``.ini`` file located under
    root =
    adb_command = adb
    adb_connect =
-
 
 where:
 
@@ -93,6 +97,43 @@ where:
   feature. Typical value here is a device IP address with optional port, which
   defaults to 5555.
 
+
+Contribution
+============
+
+There is a ``Makefile`` in the top directory, which is basic helper for running
+the tests. Please use it, and adapt/add tests for provided fixes/functionality.
+
+It requires GNU ``make`` program, and also ``virtualenv`` besides Python in
+version 2 and 3. Using it is simple as running following command:
+
+.. code:: shell-session
+
+   $ make
+
+it will run `py2`, `py3` and `flake8` jobs to check it against the code. For
+running tests against Python 3:
+
+.. code:: shell-session
+
+   $ make py3
+
+or Python 2:
+
+.. code:: shell-session
+
+   $ make py2
+
+or flake 8:
+
+.. code:: shell-session
+
+   $ make flake8
+
+Exit status on any of those means that test fail. Appropriate message/traceback
+will also be visible.
+
+
 Limitations
 ===========
 
@@ -102,6 +143,7 @@ Limitations
 * All files operations which needs root privileges will fail (for now)
 * The implementation is experimental and it's by now working with mine device;
   while it might not work with yours
+
 
 License
 =======

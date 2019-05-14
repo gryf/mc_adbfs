@@ -17,7 +17,7 @@ import re
 import subprocess
 import sys
 
-__version__ = 0.11
+__version__ = 0.12
 
 XDG_CONFIG_HOME = os.getenv('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
 
@@ -30,7 +30,15 @@ def check_output(command_list, stderr=None):
     """
     result = subprocess.check_output(command_list, stderr=stderr)
     if not isinstance(result, str):
-        result = result.decode('utf-8')
+        _result = []
+        for t in result.split(b'\n'):
+            if not t:
+                continue
+            try:
+                _result.append(t.decode('utf-8'))
+            except UnicodeDecodeError:
+                _result.append(t.decode('iso-8859-1'))
+        result = '\n'.join(_result) + '\n'
     return result
 
 
