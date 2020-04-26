@@ -200,7 +200,8 @@ class Conf(object):
                    'suppress_colors': (cfg.get, 'suppress_colors'),
                    'root': (cfg.get, 'root'),
                    'adb_command': (cfg.get, 'adb_command'),
-                   'adb_connect': (cfg.get, 'adb_connect')}
+                   'adb_connect': (cfg.get, 'adb_connect'),
+                   'try_su': (cfg.getboolean, 'try_su')}
         cfg.read(conf_fname)
 
         for key, (function, attr) in cfg_map.items():
@@ -340,7 +341,8 @@ class Adb(object):
         self._links = {}
         self._got_root = False
 
-        self.__su_check()
+        if self.conf.try_su:
+            self.__su_check()
 
     def _shell_cmd(self, with_root, *args):
         cmd = [self.conf.adb_command, 'shell']

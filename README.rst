@@ -90,12 +90,14 @@ where:
 * ``root`` root directory to read. Everything outside of that directory will be
   omitted. That would be the fastest way to access certain location on the
   device. Note, that ``dirs_to_skip`` still apply inside this directory.
-* ``adb_command`` absolute or relative path to ``adb`` command. `~/` or
+* ``adb_command`` absolute or relative path to ``adb`` command. ``~/`` or
   environment variables are allowed.
 * ``adb_connect`` specifies if connection to specific device needs to be
   performed before accessing shell. It is useful for *adb over network*
   feature. Typical value here is a device IP address with optional port, which
   defaults to 5555.
+* ``try_su`` specifies whether or not to try to detect if ``su`` command is
+  available and usable.
 
 
 Contribution
@@ -103,6 +105,9 @@ Contribution
 
 There is a ``Makefile`` in the top directory, which is basic helper for running
 the tests. Please use it, and adapt/add tests for provided fixes/functionality.
+The reason why `tox`_ wasn't used is, that there is no ``setup.py`` file, and
+it's difficult to install simple script, which isn't a python module (python
+interpreter will refuse to import module without ``.py`` extension).
 
 It requires GNU ``make`` program, and also ``virtualenv`` besides Python in
 version 2 and 3. Using it is simple as running following command:
@@ -150,3 +155,5 @@ License
 
 This software is licensed under 3-clause BSD license. See LICENSE file for
 details.
+
+.. _tox: https://tox.readthedocs.io
