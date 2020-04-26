@@ -80,6 +80,7 @@ class Conf(object):
         self.suppress_colors = False
         self.adb_command = 'adb'
         self.adb_connect = ''
+        self.try_su = False
 
         self.read()
         self.connect()

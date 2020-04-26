@@ -76,6 +76,7 @@ You can configure behaviour of this plugin using ``.ini`` file located under
    root =
    adb_command = adb
    adb_connect =
+   try_su = false
 
 where:
 
