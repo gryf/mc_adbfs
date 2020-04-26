@@ -9,7 +9,7 @@ This is Midnight Commander extfs plugin for browsing Android device through
 Rquirements
 ===========
 
-* Python 2.7 or 3.x (tested on 3.5.4)
+* Python 3.x (tested on 3.5.4, 3.6 and 3.7)
 * ``adb`` installed and in ``$PATH`` or provided via the config file
 * An Android device or emulator preferably rooted
 * ``busybox`` (``toolbox``, ``toybox``) installed and available in the path on

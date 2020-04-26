@@ -5,10 +5,7 @@ adbfs Virtual filesystem for Midnight Commander
 * Copyright (c) 2016, Roman Dobosz,
 * Published under 3-clause BSD-style license (see LICENSE file)
 """
-try:
-    import ConfigParser as configparser
-except ImportError:
-    import configparser
+import configparser
 import argparse
 from datetime import datetime
 import json
@@ -17,12 +14,8 @@ import re
 import subprocess
 import sys
 import shlex
-try:
-    from shlex import quote
-except ImportError:
-    from pipes import quote
 
-__version__ = 0.12
+__version__ = 0.13
 
 XDG_CONFIG_HOME = os.getenv('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
 
@@ -348,8 +341,8 @@ class Adb(object):
         cmd = [self.conf.adb_command, 'shell']
 
         if with_root and self._got_root:
-            _args = [quote(x) for x in args]
-            cmd += ['su', '-c', quote(' '.join(_args))]
+            _args = [shlex.quote(x) for x in args]
+            cmd += ['su', '-c', shlex.quote(' '.join(_args))]
         else:
             cmd += args
 
@@ -407,7 +400,7 @@ class Adb(object):
 
     def _retrieve_single_dir_list(self, dir_):
         """Retrieve file list using adb"""
-        lscmd = self.conf.box['rls'].format(quote(dir_))
+        lscmd = self.conf.box['rls'].format(shlex.quote(dir_))
         command = self._shell_cmd(True, *shlex.split(lscmd))
 
         try:
@@ -597,7 +590,7 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 13
 
-        cmd = self._shell_cmd(False, 'rm -r %s' % quote(dst))
+        cmd = self._shell_cmd(False, 'rm -r %s' % shlex.quote(dst))
         try:
             err = check_output(cmd).strip()
         except subprocess.CalledProcessError:
@@ -618,7 +611,7 @@ class Adb(object):
         if not dst.startswith('/'):
             dst = '/' + dst
 
-        cmd = self._shell_cmd(False, 'mkdir %s' % quote(dst))
+        cmd = self._shell_cmd(False, 'mkdir %s' % shlex.quote(dst))
         try:
             err = check_output(cmd).strip()
         except subprocess.CalledProcessError:
@@ -686,7 +679,11 @@ def main():
 
     args = parser.parse_args()
 
-    return args.func(args)
+    try:
+        return args.func(args)
+    except AttributeError:
+        parser.print_help()
+        parser.exit()
 
 
 if __name__ == '__main__':
