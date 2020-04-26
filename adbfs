@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """
 adbfs Virtual filesystem for Midnight Commander
 
@@ -15,7 +15,7 @@ import subprocess
 import sys
 import shlex
 
-__version__ = 0.13
+__version__ = 0.14
 
 XDG_CONFIG_HOME = os.getenv('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
 
@@ -572,7 +572,7 @@ class Adb(object):
             sys.stderr.write(self.error)
             return 10
 
-        cmd = self._shell_cmd(False, 'rm', dst)
+        cmd = self._shell_cmd(False, 'rm %s' % shlex.quote(dst))
         try:
             err = check_output(cmd).strip()
         except subprocess.CalledProcessError:

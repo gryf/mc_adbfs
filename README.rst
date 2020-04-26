@@ -109,25 +109,19 @@ The reason why `tox`_ wasn't used is, that there is no ``setup.py`` file, and
 it's difficult to install simple script, which isn't a python module (python
 interpreter will refuse to import module without ``.py`` extension).
 
-It requires GNU ``make`` program, and also ``virtualenv`` besides Python in
-version 2 and 3. Using it is simple as running following command:
+It requires GNU ``make`` program, and also ``virtualenv``. Using it is simple
+as running following command:
 
 .. code:: shell-session
 
    $ make
 
-it will run `py2`, `py3` and `flake8` jobs to check it against the code. For
+it will run `py3` and `flake8` jobs to check it against the code. For
 running tests against Python 3:
 
 .. code:: shell-session
 
    $ make py3
-
-or Python 2:
-
-.. code:: shell-session
-
-   $ make py2
 
 or flake 8:
 
