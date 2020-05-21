@@ -188,7 +188,7 @@ class Conf(object):
         if not os.path.exists(conf_fname):
             return
 
-        cfg = configparser.SafeConfigParser()
+        cfg = configparser.ConfigParser()
         cfg_map = {'debug': (cfg.getboolean, 'debug'),
                    'dirs_to_skip': (cfg.get, 'dirs_to_skip'),
                    'suppress_colors': (cfg.get, 'suppress_colors'),
