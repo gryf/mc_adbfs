@@ -205,7 +205,7 @@ class Conf(object):
                 pass
 
         if self.dirs_to_skip and isinstance(self.dirs_to_skip, str):
-            self.dirs_to_skip = json.loads(self.dirs_to_skip, encoding='ascii')
+            self.dirs_to_skip = json.loads(self.dirs_to_skip)
             self.dirs_to_skip = [x.encode('utf-8') for x in self.dirs_to_skip]
         else:
             self.dirs_to_skip = []
