@@ -32,7 +32,7 @@ endif
 
 ifeq ($(FL8_EXISTS), 0)
 virtualenv_flake8:
-	virtualenv -p python2 $(FL8_VENV)
+	virtualenv -p python3 $(FL8_VENV)
 	$(FL8_VENV)/bin/pip install flake8
 else
 virtualenv_flake8:

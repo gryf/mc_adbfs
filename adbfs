@@ -413,7 +413,7 @@ class Adb(object):
             sys.stderr.write('Cannot read directory. Is device connected?\n')
             return 1
 
-        lines = [l.strip() for l in lines.split('\n') if l.strip()]
+        lines = [line.strip() for line in lines.split('\n') if line.strip()]
         if len(lines) == 1:
             reg_match = self.file_re.match(lines[0])
             entry = File(**reg_match.groupdict())
