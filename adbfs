@@ -459,7 +459,7 @@ class Adb(object):
         if not root:
             lscmd = self.conf.box['ls']
         else:
-            lscmd = self.conf.box['rls'].format(shlex.quite(root.filepath))
+            lscmd = self.conf.box['rls'].format(shlex.quote(root.filepath))
 
         command = self._shell_cmd(True, *shlex.split(lscmd))
 
